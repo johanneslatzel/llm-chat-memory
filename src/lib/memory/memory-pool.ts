@@ -22,6 +22,8 @@ export interface MemoryPoolInterface {
     update(id: string, input: UpdateMemoryInput): Promise<Memory>;
     /** Permanently removes a memory by ID and deletes its JSON file. */
     delete(id: string): Promise<void>;
+    /** Recompute stale or missing embeddings for all memories. */
+    ensureEmbeddings(): Promise<void>;
 }
 
 /** Input for creating a new memory. */

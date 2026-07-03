@@ -106,6 +106,6 @@ Each memory is an individual JSON file in the `memories/` subdirectory, containi
   links.json
 ```
 
-The full directed link graph (explicit links + semantic similarity links) is persisted in `links.json` at the top level, flushed on demand via `service.links().save()`. On startup, `service.init()` loads both the individual memory files and the link graph, then recalculates PageRank scores.
+The full directed link graph (explicit links + semantic similarity links) is persisted in `links.json` at the top level, flushed on demand via `service.save()`. On startup, `service.init()` loads both the individual memory files and the link graph, then recalculates PageRank scores.
 
 This makes it easy to inspect, backup, or edit memories directly. No database needed.
