@@ -172,7 +172,12 @@ export class LinkPool implements LinkPoolInterface {
     async load(): Promise<void> {
         return this.mutex.runExclusive(async () => {
             const filePath = path.join(this.config.memoryDir, 'links.json');
-            const content = await fsp.readFile(filePath, 'utf-8');
+            let content: string;
+            try {
+                content = await fsp.readFile(filePath, 'utf-8');
+            } catch {
+                return;
+            }
             const data = JSON.parse(content) as Array<{
                 type: string;
                 from: string;

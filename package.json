@@ -1,6 +1,6 @@
 {
     "name": "@johannes.latzel/llm-chat-memory",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "description": "Memory tools for the llm-chat ecosystem",
     "license": "MIT",
     "files": [

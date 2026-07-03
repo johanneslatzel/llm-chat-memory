@@ -158,7 +158,7 @@ describe('LinkPool', () => {
     it('load handles missing file gracefully', async () => {
         await withTempDir(async (dir) => {
             const pool = new LinkPool(makeConfig(dir));
-            await expect(pool.load()).rejects.toThrow();
+            await expect(pool.load()).resolves.toBeUndefined();
         });
     });
 
