@@ -1,5 +1,6 @@
 export { MemoryConfiguration } from './lib/config.js';
 export { Memory } from './lib/memory/memory.js';
+export type { ReadonlyMemory } from './lib/memory/memory.js';
 export type { MemoryPoolInterface } from './lib/memory/memory-pool.js';
 export type { CreateMemoryInput, UpdateMemoryInput } from './lib/memory/memory-pool.js';
 export { MemoryLink, ConstantMemoryLink, SemanticMemoryLink, LinkType } from './lib/link/link.js';
