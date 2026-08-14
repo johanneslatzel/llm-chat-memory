@@ -1,7 +1,9 @@
 import * as fsp from 'node:fs/promises';
 import * as path from 'node:path';
 import { Mutex } from 'async-mutex';
+import { type HasHooks, type Hook } from '@johannes.latzel/llm-chat';
 import { Memory } from './memory.js';
+import { EventHookBuilder, HookEmitter } from '../hooks.js';
 import type { ReadonlyMemory } from './memory.js';
 import { MemoryConfiguration } from '../config.js';
 import { sanitiseId } from '../tool-utils.js';
@@ -46,15 +48,75 @@ export interface UpdateMemoryInput {
     tags?: string[];
 }
 
+/** Event data emitted when a memory is created. */
+export type MemoryCreateEvent = {
+    /** The id of the created memory. */
+    id: string;
+};
+
+/** Event data emitted when a memory is updated. */
+export type MemoryUpdateEvent = {
+    /** The id of the updated memory. */
+    id: string;
+};
+
+/** Event data emitted when a memory is deleted. */
+export type MemoryDeleteEvent = {
+    /** The id of the deleted memory. */
+    id: string;
+};
+
+/** Event data emitted when a memory is marked as recalled. */
+export type MemoryRecallEvent = {
+    /** The id of the recalled memory. */
+    id: string;
+};
+
+type MemoryHookRegistrations = {
+    onCreate: (fn: (event: MemoryCreateEvent) => void) => Hook;
+    onUpdate: (fn: (event: MemoryUpdateEvent) => void) => Hook;
+    onDelete: (fn: (event: MemoryDeleteEvent) => void) => Hook;
+    onRecall: (fn: (event: MemoryRecallEvent) => void) => Hook;
+};
+
+/** Fluent entry point for registering {@link MemoryPool} lifecycle hooks. */
+export class MemoryHookBuilder {
+    constructor(private readonly registrations: MemoryHookRegistrations) {}
+
+    /** Register a callback for when a memory is created. */
+    onCreate(): EventHookBuilder<MemoryCreateEvent> {
+        return new EventHookBuilder(this.registrations.onCreate);
+    }
+
+    /** Register a callback for when a memory is updated. */
+    onUpdate(): EventHookBuilder<MemoryUpdateEvent> {
+        return new EventHookBuilder(this.registrations.onUpdate);
+    }
+
+    /** Register a callback for when a memory is deleted. */
+    onDelete(): EventHookBuilder<MemoryDeleteEvent> {
+        return new EventHookBuilder(this.registrations.onDelete);
+    }
+
+    /** Register a callback for when a memory is marked as recalled. */
+    onRecall(): EventHookBuilder<MemoryRecallEvent> {
+        return new EventHookBuilder(this.registrations.onRecall);
+    }
+}
+
 /**
  * Thread-safe in-memory pool of {@link Memory} objects, backed by a JSON
  * directory. All mutations are serialised through an internal mutex.
  */
-export class MemoryPool implements MemoryPoolInterface {
+export class MemoryPool implements MemoryPoolInterface, HasHooks<MemoryHookBuilder> {
     private readonly _config: MemoryConfiguration;
     private readonly _data: Map<string, Memory> = new Map();
     private readonly _mutex = new Mutex();
     private readonly _embedder: TextEmbeddingProvider;
+    private readonly onCreateEmitter = new HookEmitter<(event: MemoryCreateEvent) => void>();
+    private readonly onUpdateEmitter = new HookEmitter<(event: MemoryUpdateEvent) => void>();
+    private readonly onDeleteEmitter = new HookEmitter<(event: MemoryDeleteEvent) => void>();
+    private readonly onRecallEmitter = new HookEmitter<(event: MemoryRecallEvent) => void>();
 
     /** The configuration used by this pool. */
     get config(): MemoryConfiguration {
@@ -68,6 +130,23 @@ export class MemoryPool implements MemoryPoolInterface {
     constructor(config: MemoryConfiguration, embedder: TextEmbeddingProvider) {
         this._config = config;
         this._embedder = embedder;
+    }
+
+    /**
+     * Access the hook builder for this pool.
+     * @example
+     * ```ts
+     * const hook = pool.hook().onCreate().do((event) => console.log(event));
+     * // later: hook.dispose();
+     * ```
+     */
+    hook(): MemoryHookBuilder {
+        return new MemoryHookBuilder({
+            onCreate: (fn) => this.onCreateEmitter.add(fn),
+            onUpdate: (fn) => this.onUpdateEmitter.add(fn),
+            onDelete: (fn) => this.onDeleteEmitter.add(fn),
+            onRecall: (fn) => this.onRecallEmitter.add(fn)
+        });
     }
 
     private async _save(memory: Memory): Promise<void> {
@@ -153,6 +232,7 @@ export class MemoryPool implements MemoryPoolInterface {
             await fsp.mkdir(memoriesDir, { recursive: true });
             await this._save(mem);
             this._data.set(id, mem);
+            this.onCreateEmitter.emit({ id });
             return mem;
         });
     }
@@ -182,6 +262,7 @@ export class MemoryPool implements MemoryPoolInterface {
             mem.changedAt(new Date());
 
             await this._save(mem);
+            this.onUpdateEmitter.emit({ id });
             return mem;
         });
     }
@@ -198,6 +279,7 @@ export class MemoryPool implements MemoryPoolInterface {
             this._data.delete(id);
             const memoriesDir = this._config.memoriesDir;
             await fsp.rm(path.join(memoriesDir, `${id}.json`), { force: true });
+            this.onDeleteEmitter.emit({ id });
         });
     }
 
@@ -335,6 +417,7 @@ export class MemoryPool implements MemoryPoolInterface {
             if (!mem) return;
             mem.recalledAt(new Date());
             await this._save(mem);
+            this.onRecallEmitter.emit({ id });
         });
     }
 }

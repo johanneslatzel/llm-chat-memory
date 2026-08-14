@@ -27,7 +27,7 @@ Persistent memory for LLM agents by active (tool call) and passive (inject) reca
 
 ## Prerequisites
 
-- Node.js >= 18
+- Node.js >= 20.9.0
 
 ## Installation
 

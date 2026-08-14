@@ -1,9 +1,17 @@
 import { Mutex } from 'async-mutex';
-import { ChatMessageOrigin, ChatRole, ChatService, Hook } from '@johannes.latzel/llm-chat';
+import {
+    ChatMessageOrigin,
+    ChatRole,
+    ChatService,
+    Hook,
+    type HasHooks
+} from '@johannes.latzel/llm-chat';
 import { PageRank } from '@johannes.latzel/pagerank';
 import { MemoryConfiguration } from './config.js';
 import { MemoryPool, type MemoryPoolInterface } from './memory/memory-pool.js';
 import { LinkPool, type LinkPoolInterface } from './link/link-pool.js';
+import { type MemoryHookBuilder } from './memory/memory-pool.js';
+import { type LinkHookBuilder } from './link/link-pool.js';
 import { SemanticLinker, type Linker } from './link/semantic-linker.js';
 import { MMRSelectionStrategy } from './selection/mmr.js';
 import { ScoreComposer } from './selection/composer.js';
@@ -133,6 +141,27 @@ class MemoryHook {
 }
 
 /**
+ * Fluent entry point for registering {@link MemoryService} lifecycle hooks.
+ * Routes to the underlying {@link MemoryPool} and {@link LinkPool} builders.
+ */
+export class MemoryServiceHookBuilder {
+    constructor(
+        private readonly memoryBuilder: MemoryHookBuilder,
+        private readonly linkBuilder: LinkHookBuilder
+    ) {}
+
+    /** Register hooks on the memory pool (create/update/delete/recall). */
+    memories(): MemoryHookBuilder {
+        return this.memoryBuilder;
+    }
+
+    /** Register hooks on the link pool (link/unlink). */
+    links(): LinkHookBuilder {
+        return this.linkBuilder;
+    }
+}
+
+/**
  * Single entry point that owns a {@link MemoryPool}, a {@link LinkPool},
  * a {@link TextEmbeddingProvider}, a {@link SelectionStrategy}, and optional
  * ChatService lifecycle hooks for automatic memory recall.
@@ -141,13 +170,14 @@ class MemoryHook {
  * - `recall()` runs pool recall, then selects via the strategy, then marks recalled on disk.
  * - `score()` runs PageRank over the link graph and updates scores.
  * - `memories()` / `links()` expose narrow interfaces for CRUD and link management.
+ * - `hook()` exposes lifecycle hooks for the memory and link pools.
  * - `save()` persists links to disk — call before shutdown.
  * - Deleting a memory: call `memories().delete(id)` and `links().isolate(id)`.
  * - `hookInto()` creates a {@link MemoryHook} and registers lifecycle hooks
  *   for passive recall on a ChatService. Returns the {@link MemoryHook} so callers
  *   can {@link MemoryHook.dispose dispose} the hooks later.
  */
-export class MemoryService {
+export class MemoryService implements HasHooks<MemoryServiceHookBuilder> {
     private readonly _config: MemoryConfiguration;
     private readonly pool: MemoryPool;
     private readonly linkPool: LinkPool;
@@ -204,6 +234,18 @@ export class MemoryService {
     /** Returns an interface for managing constant links between memories. */
     links(): LinkPoolInterface {
         return this.linkPool;
+    }
+
+    /**
+     * Access the hook builder for this service.
+     * @example
+     * ```ts
+     * const hook = service.hook().memories().onCreate().do((event) => console.log(event));
+     * // later: hook.dispose();
+     * ```
+     */
+    hook(): MemoryServiceHookBuilder {
+        return new MemoryServiceHookBuilder(this.pool.hook(), this.linkPool.hook());
     }
 
     /**

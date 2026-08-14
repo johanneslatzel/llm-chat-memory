@@ -1,11 +1,19 @@
 export { MemoryConfiguration } from './lib/config.js';
 export { Memory } from './lib/memory/memory.js';
 export type { ReadonlyMemory } from './lib/memory/memory.js';
-export type { MemoryPoolInterface } from './lib/memory/memory-pool.js';
+export { MemoryHookBuilder } from './lib/memory/memory-pool.js';
+export type {
+    MemoryPoolInterface,
+    MemoryCreateEvent,
+    MemoryUpdateEvent,
+    MemoryDeleteEvent,
+    MemoryRecallEvent
+} from './lib/memory/memory-pool.js';
 export type { CreateMemoryInput, UpdateMemoryInput } from './lib/memory/memory-pool.js';
 export { MemoryLink, ConstantMemoryLink, SemanticMemoryLink, LinkType } from './lib/link/link.js';
-export { MemoryService } from './lib/memory-service.js';
-export type { LinkPoolInterface } from './lib/link/link-pool.js';
+export { MemoryService, MemoryServiceHookBuilder } from './lib/memory-service.js';
+export { LinkHookBuilder } from './lib/link/link-pool.js';
+export type { LinkPoolInterface, LinkCreateEvent, LinkRemoveEvent } from './lib/link/link-pool.js';
 export { SemanticLinker } from './lib/link/semantic-linker.js';
 export type { Linker } from './lib/link/semantic-linker.js';
 export { MMRSelectionStrategy } from './lib/selection/mmr.js';

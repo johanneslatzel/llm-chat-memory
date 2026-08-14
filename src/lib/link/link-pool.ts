@@ -1,8 +1,10 @@
 import * as fsp from 'node:fs/promises';
 import * as path from 'node:path';
 import { Mutex } from 'async-mutex';
+import { type HasHooks, type Hook } from '@johannes.latzel/llm-chat';
 import { MemoryLink, ConstantMemoryLink, SemanticMemoryLink, LinkType } from './link.js';
 import type { MemoryConfiguration } from '../config.js';
+import { EventHookBuilder, HookEmitter } from '../hooks.js';
 
 /** Public interface for managing constant links between memories. */
 export interface LinkPoolInterface {
@@ -18,15 +20,68 @@ export interface LinkPoolInterface {
     isolate(id: string): Promise<void>;
 }
 
+/** Event data emitted when a constant link is created. */
+export type LinkCreateEvent = {
+    /** The source memory id. */
+    from: string;
+    /** The target memory id. */
+    to: string;
+};
+
+/** Event data emitted when a constant link is removed. */
+export type LinkRemoveEvent = {
+    /** The source memory id. */
+    from: string;
+    /** The target memory id. */
+    to: string;
+};
+
+type LinkHookRegistrations = {
+    onLink: (fn: (event: LinkCreateEvent) => void) => Hook;
+    onUnlink: (fn: (event: LinkRemoveEvent) => void) => Hook;
+};
+
+/** Fluent entry point for registering {@link LinkPool} lifecycle hooks. */
+export class LinkHookBuilder {
+    constructor(private readonly registrations: LinkHookRegistrations) {}
+
+    /** Register a callback for when a constant link is created. */
+    onLink(): EventHookBuilder<LinkCreateEvent> {
+        return new EventHookBuilder(this.registrations.onLink);
+    }
+
+    /** Register a callback for when a constant link is removed. */
+    onUnlink(): EventHookBuilder<LinkRemoveEvent> {
+        return new EventHookBuilder(this.registrations.onUnlink);
+    }
+}
+
 /** Manages the collection of directional links between memories. */
-export class LinkPool implements LinkPoolInterface {
+export class LinkPool implements LinkPoolInterface, HasHooks<LinkHookBuilder> {
     private links = new Map<string, MemoryLink>();
     private semanticKeys = new Set<string>();
     private config: MemoryConfiguration;
     private readonly mutex = new Mutex();
+    private readonly onLinkEmitter = new HookEmitter<(event: LinkCreateEvent) => void>();
+    private readonly onUnlinkEmitter = new HookEmitter<(event: LinkRemoveEvent) => void>();
 
     constructor(config: MemoryConfiguration) {
         this.config = config;
+    }
+
+    /**
+     * Access the hook builder for this pool.
+     * @example
+     * ```ts
+     * const hook = pool.hook().onLink().do((event) => console.log(event));
+     * // later: hook.dispose();
+     * ```
+     */
+    hook(): LinkHookBuilder {
+        return new LinkHookBuilder({
+            onLink: (fn) => this.onLinkEmitter.add(fn),
+            onUnlink: (fn) => this.onUnlinkEmitter.add(fn)
+        });
     }
 
     private key(from: string, to: string): string {
@@ -63,6 +118,7 @@ export class LinkPool implements LinkPoolInterface {
                 if (link.from === id || link.to === id) {
                     this.links.delete(k);
                     this.semanticKeys.delete(k);
+                    this.onUnlinkEmitter.emit({ from: link.from, to: link.to });
                 }
             }
         });
@@ -107,12 +163,14 @@ export class LinkPool implements LinkPoolInterface {
                     this.links.set(k, new ConstantMemoryLink(from, target));
                     this.semanticKeys.delete(k);
                     linked.push(target);
+                    this.onLinkEmitter.emit({ from, to: target });
                     if (undirected) {
                         const rk = this.key(target, from);
                         const rexisting = this.links.get(rk);
                         if (!(rexisting instanceof ConstantMemoryLink)) {
                             this.links.set(rk, new ConstantMemoryLink(target, from));
                             this.semanticKeys.delete(rk);
+                            this.onLinkEmitter.emit({ from: target, to: from });
                         }
                     }
                 }
@@ -125,12 +183,14 @@ export class LinkPool implements LinkPoolInterface {
             if (existing instanceof ConstantMemoryLink) return;
             this.links.set(k, new ConstantMemoryLink(from, toOrTargets));
             this.semanticKeys.delete(k);
+            this.onLinkEmitter.emit({ from, to: toOrTargets });
             if (undirected) {
                 const rk = this.key(toOrTargets, from);
                 const rexisting = this.links.get(rk);
                 if (!(rexisting instanceof ConstantMemoryLink)) {
                     this.links.set(rk, new ConstantMemoryLink(toOrTargets, from));
                     this.semanticKeys.delete(rk);
+                    this.onLinkEmitter.emit({ from: toOrTargets, to: from });
                 }
             }
         });
@@ -150,10 +210,13 @@ export class LinkPool implements LinkPoolInterface {
             return;
         }
         return this.mutex.runExclusive(() => {
-            this.links.delete(this.key(from, toOrTargets));
+            const removed = this.links.delete(this.key(from, toOrTargets));
+            let removedReverse = false;
             if (undirected) {
-                this.links.delete(this.key(toOrTargets, from));
+                removedReverse = this.links.delete(this.key(toOrTargets, from));
             }
+            if (removed) this.onUnlinkEmitter.emit({ from, to: toOrTargets });
+            if (removedReverse) this.onUnlinkEmitter.emit({ from: toOrTargets, to: from });
         });
     }
 
