@@ -1,5 +1,3 @@
-import * as fsp from 'node:fs/promises';
-import * as path from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { MemoryService } from '../../src/lib/memory-service.js';
 import type { MemoryPool } from '../../src/lib/memory/memory-pool.js';
@@ -12,7 +10,6 @@ describe('Link lifecycle integration', () => {
     it('semantic linker creates auto-links for similar memories', async () => {
         await withTempDir(async (dir) => {
             const config = testConfig(dir);
-            await fsp.writeFile(path.join(dir, 'links.json'), '[]', 'utf-8');
 
             const service = new MemoryService(config, new MockEmbedder());
             await service.init();
@@ -46,7 +43,6 @@ describe('Link lifecycle integration', () => {
     it('constant links survive semantic linker sync', async () => {
         await withTempDir(async (dir) => {
             const config = testConfig(dir);
-            await fsp.writeFile(path.join(dir, 'links.json'), '[]', 'utf-8');
 
             const service = new MemoryService(config, new MockEmbedder());
             await service.init();
@@ -75,7 +71,6 @@ describe('Link lifecycle integration', () => {
     it('delete memory isolates all incident edges', async () => {
         await withTempDir(async (dir) => {
             const config = testConfig(dir);
-            await fsp.writeFile(path.join(dir, 'links.json'), '[]', 'utf-8');
 
             const service = new MemoryService(config, new MockEmbedder());
             await service.init();

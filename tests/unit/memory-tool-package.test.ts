@@ -21,7 +21,8 @@ describe('MemoryToolPackage', () => {
             const config = testConfig(dir);
             const service = new MemoryService(config, new MockEmbedder());
             const pkg = new MemoryToolPackage(service);
-            expect(pkg.tutorial()?.length).toBeGreaterThan(50);
+            const tutorial = pkg.tutorial();
+            expect(tutorial?.length).toBeGreaterThan(50);
         });
     });
 });

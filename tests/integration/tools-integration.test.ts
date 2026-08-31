@@ -1,5 +1,3 @@
-import * as fsp from 'node:fs/promises';
-import * as path from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { MemoryService } from '../../src/lib/memory-service.js';
 import { MemoryToolPackage } from '../../src/tools/memory-tool-package.js';
@@ -41,7 +39,6 @@ function setup(dir: string): {
 describe('MemoryToolPackage integration – full tool chain', () => {
     it('chains add → get → update → recall → link → unlink → delete with correct state at each step', async () => {
         await withTempDir(async (dir) => {
-            await fsp.writeFile(path.join(dir, 'links.json'), '[]', 'utf-8');
             const { service, add, get, update, del, recall, link, unlink, pkg } = setup(dir);
             await service.init();
 

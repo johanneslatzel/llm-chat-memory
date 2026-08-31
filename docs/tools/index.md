@@ -1,21 +1,44 @@
 # LLM tools
 
-Seven tools give the LLM read/write access to memories. Register them with the service:
+Seven tools give the LLM read/write access to memories. Register them on a
+`ChatService`, constructing each tool from a `MemoryService`:
 
 ```typescript
-service.tools().add(new AddMemoryTool(service));
-service.tools().add(new UpdateMemoryTool(service));
-service.tools().add(new DeleteMemoryTool(service));
-service.tools().add(new GetMemoryTool(service));
-service.tools().add(new RecallMemoriesTool(service));
-service.tools().add(new LinkMemoriesTool(service));
-service.tools().add(new UnlinkMemoriesTool(service));
+import {
+    MemoryService,
+    AddMemoryTool,
+    UpdateMemoryTool,
+    DeleteMemoryTool,
+    GetMemoryTool,
+    RecallMemoriesTool,
+    LinkMemoriesTool,
+    UnlinkMemoriesTool
+} from '@johannes.latzel/llm-chat-memory';
+import { OpenAIChatService } from '@johannes.latzel/llm-chat';
+
+const memoryService = new MemoryService(config, embedder);
+await memoryService.init();
+const chatService = new OpenAIChatService(/* ... */);
+
+chatService.tools().add(new AddMemoryTool(memoryService));
+chatService.tools().add(new UpdateMemoryTool(memoryService));
+chatService.tools().add(new DeleteMemoryTool(memoryService));
+chatService.tools().add(new GetMemoryTool(memoryService));
+chatService.tools().add(new RecallMemoriesTool(memoryService));
+chatService.tools().add(new LinkMemoriesTool(memoryService));
+chatService.tools().add(new UnlinkMemoriesTool(memoryService));
 ```
 
-Or bundle all seven:
+Or bundle all seven with `MemoryToolPackage`:
 
 ```typescript
-service.tools().add(new MemoryToolPackage(service));
+import { MemoryService, MemoryToolPackage } from '@johannes.latzel/llm-chat-memory';
+import { OpenAIChatService } from '@johannes.latzel/llm-chat';
+
+const memoryService = new MemoryService(config, embedder);
+await memoryService.init();
+const chatService = new OpenAIChatService(/* ... */);
+chatService.tools().add(new MemoryToolPackage(memoryService));
 ```
 
 | Tool | What it does |

@@ -5,17 +5,18 @@ export enum LinkType {
 }
 
 /**
- * Serialised form of a {@link MemoryLink}, used for JSON persistence.
+ * Serialised form of a {@link MemoryLink} as stored on its source memory.
+ *
+ * `from` is implicit: the entry lives in the owning memory's JSON file, so
+ * only the target and type-specific fields are stored.
  */
-export type LinkJSON =
+export type MemoryLinkJSON =
     | {
           type: LinkType.Constant;
-          from: string;
           to: string;
       }
     | {
           type: LinkType.Semantic;
-          from: string;
           to: string;
           weight: number;
           cachedAt: number;
@@ -39,16 +40,16 @@ export abstract class MemoryLink {
 
     /** Returns the current weight of this link for PageRank scoring. */
     abstract weight(): number;
-    /** Serialises this link to a plain JSON-compatible object. */
-    abstract toJSON(): LinkJSON;
+    /** Serialises this link to the owner-relative JSON form stored on the source memory. */
+    abstract toMemoryLinkJSON(): MemoryLinkJSON;
 
-    /** Deserialises a link from stored JSON data. */
-    static fromJSON(data: LinkJSON): MemoryLink {
+    /** Deserialises a link from stored JSON data, owned by the given memory. */
+    static fromMemoryLinkJSON(owner: string, data: MemoryLinkJSON): MemoryLink {
         switch (data.type) {
             case LinkType.Constant:
-                return new ConstantMemoryLink(data.from, data.to);
+                return new ConstantMemoryLink(owner, data.to);
             case LinkType.Semantic:
-                return new SemanticMemoryLink(data.from, data.to, data.weight, data.cachedAt);
+                return new SemanticMemoryLink(owner, data.to, data.weight, data.cachedAt);
         }
     }
 }
@@ -59,8 +60,8 @@ export class ConstantMemoryLink extends MemoryLink {
         return 10;
     }
 
-    toJSON(): LinkJSON {
-        return { type: LinkType.Constant, from: this.from, to: this.to };
+    toMemoryLinkJSON(): MemoryLinkJSON {
+        return { type: LinkType.Constant, to: this.to };
     }
 }
 
@@ -79,10 +80,9 @@ export class SemanticMemoryLink extends MemoryLink {
         return this._weight;
     }
 
-    toJSON(): LinkJSON {
+    toMemoryLinkJSON(): MemoryLinkJSON {
         return {
             type: LinkType.Semantic,
-            from: this.from,
             to: this.to,
             weight: this._weight,
             cachedAt: this.cachedAt

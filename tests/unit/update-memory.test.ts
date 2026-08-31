@@ -26,7 +26,7 @@ describe('UpdateMemoryTool', () => {
             const { tool, pool } = await createToolAndMemory(dir);
             const result = await tool.execute({ id: 'update-test', content: 'Updated' });
             expect(result[0]!.status).toBe('success');
-            expect((await pool.get('update-test'))?.content()).toBe('Updated');
+            expect((await pool.get('update-test'))?.content).toBe('Updated');
         });
     });
 
@@ -35,7 +35,7 @@ describe('UpdateMemoryTool', () => {
             const { tool, pool } = await createToolAndMemory(dir);
             const result = await tool.execute({ id: 'update-test', summary: 'New summary' });
             expect(result[0]!.status).toBe('success');
-            expect((await pool.get('update-test'))?.summary()).toBe('New summary');
+            expect((await pool.get('update-test'))?.summary).toBe('New summary');
         });
     });
 
@@ -62,17 +62,17 @@ describe('UpdateMemoryTool', () => {
             const { tool, pool } = await createToolAndMemory(dir);
             const result = await tool.execute({ id: 'update-test', tags: ['new1', 'new2'] });
             expect(result[0]!.status).toBe('success');
-            expect((await pool.get('update-test'))?.tags()).toEqual(['new1', 'new2']);
+            expect((await pool.get('update-test'))?.tags).toEqual(['new1', 'new2']);
         });
     });
 
     it('updates changedAt timestamp', async () => {
         await withTempDir(async (dir) => {
             const { tool, pool } = await createToolAndMemory(dir);
-            const before = (await pool.get('update-test'))!.changedAt().getTime();
+            const before = (await pool.get('update-test'))!.changedAt.getTime();
             await new Promise((r) => setTimeout(r, 10));
             await tool.execute({ id: 'update-test', content: 'New content' });
-            expect((await pool.get('update-test'))!.changedAt().getTime()).toBeGreaterThan(before);
+            expect((await pool.get('update-test'))!.changedAt.getTime()).toBeGreaterThan(before);
         });
     });
 

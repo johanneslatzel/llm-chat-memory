@@ -1,9 +1,7 @@
-import * as fsp from 'node:fs/promises';
-import * as path from 'node:path';
 import { Mutex } from 'async-mutex';
 import { type HasHooks, type Hook } from '@johannes.latzel/llm-chat';
-import { MemoryLink, ConstantMemoryLink, SemanticMemoryLink, LinkType } from './link.js';
-import type { MemoryConfiguration } from '../config.js';
+import { MemoryLink, ConstantMemoryLink, SemanticMemoryLink } from './link.js';
+import type { MemoryPool } from '../memory/memory-pool.js';
 import { EventHookBuilder, HookEmitter } from '../hooks.js';
 
 /** Public interface for managing constant links between memories. */
@@ -56,17 +54,25 @@ export class LinkHookBuilder {
     }
 }
 
-/** Manages the collection of directional links between memories. */
+/**
+ * Manages the collection of directional links between memories.
+ *
+ * The in-memory graph is a nested map keyed by source then target
+ * (`from -> to -> MemoryLink`), giving O(1) membership checks for link/unlink
+ * deduplication and O(outgoing) retrieval of a single source's links. Links
+ * are persisted on their source memory (each `MemoryJSON` carries its own
+ * outgoing `links` field) via the injected {@link MemoryPool}.
+ */
 export class LinkPool implements LinkPoolInterface, HasHooks<LinkHookBuilder> {
-    private links = new Map<string, MemoryLink>();
+    private links = new Map<string, Map<string, MemoryLink>>();
     private semanticKeys = new Set<string>();
-    private config: MemoryConfiguration;
+    private pool: MemoryPool;
     private readonly mutex = new Mutex();
     private readonly onLinkEmitter = new HookEmitter<(event: LinkCreateEvent) => void>();
     private readonly onUnlinkEmitter = new HookEmitter<(event: LinkRemoveEvent) => void>();
 
-    constructor(config: MemoryConfiguration) {
-        this.config = config;
+    constructor(pool: MemoryPool) {
+        this.pool = pool;
     }
 
     /**
@@ -88,38 +94,83 @@ export class LinkPool implements LinkPoolInterface, HasHooks<LinkHookBuilder> {
         return `${from}::${to}`;
     }
 
+    private getLink(from: string, to: string): MemoryLink | undefined {
+        return this.links.get(from)?.get(to);
+    }
+
+    private setLink(link: MemoryLink): void {
+        let source = this.links.get(link.from);
+        if (!source) {
+            source = new Map();
+            this.links.set(link.from, source);
+        }
+        source.set(link.to, link);
+    }
+
+    private deleteLink(from: string, to: string): boolean {
+        const source = this.links.get(from);
+        if (!source) return false;
+        const removed = source.delete(to);
+        if (source.size === 0) this.links.delete(from);
+        return removed;
+    }
+
+    private outgoing(from: string): MemoryLink[] {
+        return Array.from(this.links.get(from)?.values() ?? []);
+    }
+
+    /**
+     * Persists a source memory's outgoing links by rewriting its `links` field
+     * through the pool. Only the source's own outgoing links are collected.
+     */
+    private async _persistSource(from: string): Promise<void> {
+        const outgoingLinks = this.outgoing(from).map((l) => l.toMemoryLinkJSON());
+        await this.pool.updateLinks(from, outgoingLinks);
+    }
+
     /**
      * Creates a constant link from `from` to `to`.
      * If a constant link already exists this is a no-op.
      */
     async add(from: string, to: string): Promise<void> {
-        return this.mutex.runExclusive(() => {
-            const k = this.key(from, to);
-            const existing = this.links.get(k);
+        return this.mutex.runExclusive(async () => {
+            const existing = this.getLink(from, to);
             if (existing instanceof ConstantMemoryLink) return;
-            this.links.set(k, new ConstantMemoryLink(from, to));
-            this.semanticKeys.delete(k);
+            this.setLink(new ConstantMemoryLink(from, to));
+            this.semanticKeys.delete(this.key(from, to));
+            await this._persistSource(from);
         });
     }
 
     /** Removes the link from `from` to `to`, if it exists. */
     async remove(from: string, to: string): Promise<void> {
-        return this.mutex.runExclusive(() => {
-            const k = this.key(from, to);
-            this.links.delete(k);
-            this.semanticKeys.delete(k);
+        return this.mutex.runExclusive(async () => {
+            const removed = this.deleteLink(from, to);
+            this.semanticKeys.delete(this.key(from, to));
+            if (removed) await this._persistSource(from);
         });
     }
 
     /** Removes every link that involves the given memory ID (source or target). */
     async isolate(id: string): Promise<void> {
-        return this.mutex.runExclusive(() => {
-            for (const [k, link] of this.links) {
-                if (link.from === id || link.to === id) {
-                    this.links.delete(k);
-                    this.semanticKeys.delete(k);
-                    this.onUnlinkEmitter.emit({ from: link.from, to: link.to });
+        return this.mutex.runExclusive(async () => {
+            const toDelete: MemoryLink[] = [];
+            for (const source of this.links.values()) {
+                for (const link of source.values()) {
+                    if (link.from === id || link.to === id) {
+                        toDelete.push(link);
+                    }
                 }
+            }
+            const affectedSources = new Set<string>();
+            for (const link of toDelete) {
+                this.deleteLink(link.from, link.to);
+                this.semanticKeys.delete(this.key(link.from, link.to));
+                this.onUnlinkEmitter.emit({ from: link.from, to: link.to });
+                affectedSources.add(link.from);
+            }
+            for (const source of affectedSources) {
+                await this._persistSource(source);
             }
         });
     }
@@ -130,17 +181,30 @@ export class LinkPool implements LinkPoolInterface, HasHooks<LinkHookBuilder> {
     async syncSemanticLinks(
         edges: Array<{ from: string; to: string; weight: number }>
     ): Promise<void> {
-        return this.mutex.runExclusive(() => {
+        return this.mutex.runExclusive(async () => {
+            // remember sources that currently have semantic links so stale
+            // semantic entries are cleared even when the new pass leaves them empty
+            const staleSemanticSources = new Set<string>();
             for (const k of this.semanticKeys) {
-                this.links.delete(k);
+                staleSemanticSources.add(k.slice(0, k.indexOf('::')));
+            }
+
+            for (const k of this.semanticKeys) {
+                const sep = k.indexOf('::');
+                this.deleteLink(k.slice(0, sep), k.slice(sep + 2));
             }
             this.semanticKeys.clear();
             for (const edge of edges) {
-                const k = this.key(edge.from, edge.to);
-                const existing = this.links.get(k);
+                const existing = this.getLink(edge.from, edge.to);
                 if (existing instanceof ConstantMemoryLink) continue;
-                this.links.set(k, new SemanticMemoryLink(edge.from, edge.to, edge.weight));
-                this.semanticKeys.add(k);
+                this.setLink(new SemanticMemoryLink(edge.from, edge.to, edge.weight));
+                this.semanticKeys.add(this.key(edge.from, edge.to));
+            }
+
+            const touched = new Set(staleSemanticSources);
+            for (const edge of edges) touched.add(edge.from);
+            for (const source of touched) {
+                await this._persistSource(source);
             }
         });
     }
@@ -153,45 +217,55 @@ export class LinkPool implements LinkPoolInterface, HasHooks<LinkHookBuilder> {
         undirected?: boolean
     ): Promise<void | string[]> {
         if (Array.isArray(toOrTargets)) {
-            return this.mutex.runExclusive(() => {
+            return this.mutex.runExclusive(async () => {
                 const linked: string[] = [];
+                const reverseSources = new Set<string>();
                 for (const target of toOrTargets) {
                     if (target === from) continue;
-                    const k = this.key(from, target);
-                    const existing = this.links.get(k);
+                    const existing = this.getLink(from, target);
                     if (existing instanceof ConstantMemoryLink) continue;
-                    this.links.set(k, new ConstantMemoryLink(from, target));
-                    this.semanticKeys.delete(k);
+                    this.setLink(new ConstantMemoryLink(from, target));
+                    this.semanticKeys.delete(this.key(from, target));
                     linked.push(target);
                     this.onLinkEmitter.emit({ from, to: target });
                     if (undirected) {
-                        const rk = this.key(target, from);
-                        const rexisting = this.links.get(rk);
+                        const rexisting = this.getLink(target, from);
                         if (!(rexisting instanceof ConstantMemoryLink)) {
-                            this.links.set(rk, new ConstantMemoryLink(target, from));
-                            this.semanticKeys.delete(rk);
+                            this.setLink(new ConstantMemoryLink(target, from));
+                            this.semanticKeys.delete(this.key(target, from));
                             this.onLinkEmitter.emit({ from: target, to: from });
+                            reverseSources.add(target);
                         }
+                    }
+                }
+                if (linked.length > 0 || reverseSources.size > 0) {
+                    await this._persistSource(from);
+                    for (const target of reverseSources) {
+                        await this._persistSource(target);
                     }
                 }
                 return linked;
             });
         }
-        return this.mutex.runExclusive(() => {
-            const k = this.key(from, toOrTargets);
-            const existing = this.links.get(k);
+        return this.mutex.runExclusive(async () => {
+            const existing = this.getLink(from, toOrTargets);
             if (existing instanceof ConstantMemoryLink) return;
-            this.links.set(k, new ConstantMemoryLink(from, toOrTargets));
-            this.semanticKeys.delete(k);
+            this.setLink(new ConstantMemoryLink(from, toOrTargets));
+            this.semanticKeys.delete(this.key(from, toOrTargets));
             this.onLinkEmitter.emit({ from, to: toOrTargets });
+            let reverseSource: string | null = null;
             if (undirected) {
-                const rk = this.key(toOrTargets, from);
-                const rexisting = this.links.get(rk);
+                const rexisting = this.getLink(toOrTargets, from);
                 if (!(rexisting instanceof ConstantMemoryLink)) {
-                    this.links.set(rk, new ConstantMemoryLink(toOrTargets, from));
-                    this.semanticKeys.delete(rk);
+                    this.setLink(new ConstantMemoryLink(toOrTargets, from));
+                    this.semanticKeys.delete(this.key(toOrTargets, from));
                     this.onLinkEmitter.emit({ from: toOrTargets, to: from });
+                    reverseSource = toOrTargets;
                 }
+            }
+            await this._persistSource(from);
+            if (reverseSource !== null) {
+                await this._persistSource(reverseSource);
             }
         });
     }
@@ -209,14 +283,20 @@ export class LinkPool implements LinkPoolInterface, HasHooks<LinkHookBuilder> {
             }
             return;
         }
-        return this.mutex.runExclusive(() => {
-            const removed = this.links.delete(this.key(from, toOrTargets));
+        return this.mutex.runExclusive(async () => {
+            const removed = this.deleteLink(from, toOrTargets);
             let removedReverse = false;
             if (undirected) {
-                removedReverse = this.links.delete(this.key(toOrTargets, from));
+                removedReverse = this.deleteLink(toOrTargets, from);
             }
-            if (removed) this.onUnlinkEmitter.emit({ from, to: toOrTargets });
-            if (removedReverse) this.onUnlinkEmitter.emit({ from: toOrTargets, to: from });
+            if (removed) {
+                this.onUnlinkEmitter.emit({ from, to: toOrTargets });
+                await this._persistSource(from);
+            }
+            if (removedReverse) {
+                this.onUnlinkEmitter.emit({ from: toOrTargets, to: from });
+                await this._persistSource(toOrTargets);
+            }
         });
     }
 
@@ -224,60 +304,31 @@ export class LinkPool implements LinkPoolInterface, HasHooks<LinkHookBuilder> {
     async getEdges(): Promise<Array<{ from: string; to: string; weight: number }>> {
         return this.mutex.runExclusive(() => {
             const edges: Array<{ from: string; to: string; weight: number }> = [];
-            for (const link of this.links.values()) {
-                edges.push({ from: link.from, to: link.to, weight: link.weight() });
+            for (const source of this.links.values()) {
+                for (const link of source.values()) {
+                    edges.push({ from: link.from, to: link.to, weight: link.weight() });
+                }
             }
             return edges;
         });
     }
 
-    /** Loads links from `links.json` in the configured memory directory. */
+    /** Rebuilds the working graph from the outgoing links stored on each memory. */
     async load(): Promise<void> {
         return this.mutex.runExclusive(async () => {
-            const filePath = path.join(this.config.memoryDir, 'links.json');
-            let content: string;
-            try {
-                content = await fsp.readFile(filePath, 'utf-8');
-            } catch {
-                return;
-            }
-            const data = JSON.parse(content) as Array<{
-                type: string;
-                from: string;
-                to: string;
-                weight?: number;
-                cachedAt?: number;
-            }>;
             this.links.clear();
             this.semanticKeys.clear();
-            for (const item of data) {
-                const k = this.key(item.from, item.to);
-                switch (item.type as LinkType) {
-                    case LinkType.Constant:
-                        this.links.set(k, new ConstantMemoryLink(item.from, item.to));
-                        break;
-                    case LinkType.Semantic:
-                        this.links.set(
-                            k,
-                            new SemanticMemoryLink(item.from, item.to, item.weight!, item.cachedAt)
-                        );
-                        this.semanticKeys.add(k);
-                        break;
-                    default:
-                        break;
+            const memories = await this.pool.all();
+            for (const mem of memories) {
+                const owner = mem.id();
+                for (const entry of mem.toJSON().links) {
+                    const link = MemoryLink.fromMemoryLinkJSON(owner, entry);
+                    this.setLink(link);
+                    if (link instanceof SemanticMemoryLink) {
+                        this.semanticKeys.add(this.key(owner, link.to));
+                    }
                 }
             }
-        });
-    }
-
-    /** Persists all links to `links.json` in the configured memory directory. */
-    async save(): Promise<void> {
-        return this.mutex.runExclusive(async () => {
-            if (this.links.size === 0) return;
-            const filePath = path.join(this.config.memoryDir, 'links.json');
-            const data = Array.from(this.links.values()).map((link) => link.toJSON());
-            await fsp.mkdir(path.dirname(filePath), { recursive: true });
-            await fsp.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8');
         });
     }
 }

@@ -1,8 +1,10 @@
 import * as fsp from 'node:fs/promises';
 import * as path from 'node:path';
 import { describe, it, expect } from 'vitest';
+import { JsonFileStore, MemoryStore } from '@johannes.latzel/json-file-store';
 import { MemoryConfiguration } from '../../src/lib/config.js';
 import { MemoryPool } from '../../src/lib/memory/memory-pool.js';
+import type { MemoryJSON } from '../../src/lib/memory/memory.js';
 import { findElbow, cosineSimilarity } from '../../src/lib/util.js';
 import { MemoryService } from '../../src/lib/memory-service.js';
 import { testConfig } from '../helper/config.js';
@@ -25,12 +27,12 @@ describe('MemoryPool', () => {
             const pool = new MemoryPool(config, new MockEmbedder());
             const memory = await pool.create('my-label', { content: 'Content', summary: 'My summary', tags: ['test'] });
             expect(memory.id()).toBe('my-label');
-            expect(memory.content()).toBe('Content');
+            expect(memory.content).toBe('Content');
 
             const retrieved = await pool.get('my-label');
             expect(retrieved).toBeDefined();
             expect(retrieved!.id()).toBe('my-label');
-            expect(retrieved!.content()).toBe('Content');
+            expect(retrieved!.content).toBe('Content');
 
             expect(await pool.get('nonexistent')).toBeUndefined();
         });
@@ -75,7 +77,7 @@ describe('MemoryPool', () => {
             const config = testConfig(dir);
             const pool = new MemoryPool(config, new MockEmbedder());
             const memory = await pool.create('x', { content: 'test', summary: 'My summary', tags: ['test'] });
-            expect(memory.score()).toBe(1);
+            expect(memory.score).toBe(1);
         });
     });
 
@@ -115,10 +117,10 @@ describe('MemoryPool', () => {
             });
 
             const memory = (await pool.get('x'))!;
-            expect(memory.content()).toBe('Updated');
-            expect(memory.summary()).toBe('Updated summary');
-            expect(memory.tags()).toEqual(['new']);
-            expect(memory.score()).toBe(1);
+            expect(memory.content).toBe('Updated');
+            expect(memory.summary).toBe('Updated summary');
+            expect(memory.tags).toEqual(['new']);
+            expect(memory.score).toBe(1);
         });
     });
 
@@ -135,10 +137,10 @@ describe('MemoryPool', () => {
             await pool.update('x', { content: 'Only content' });
 
             const memory = (await pool.get('x'))!;
-            expect(memory.content()).toBe('Only content');
-            expect(memory.summary()).toBe('My summary');
-            expect(memory.tags()).toEqual(['tag']);
-            expect(memory.score()).toBe(1);
+            expect(memory.content).toBe('Only content');
+            expect(memory.summary).toBe('My summary');
+            expect(memory.tags).toEqual(['tag']);
+            expect(memory.score).toBe(1);
         });
     });
 
@@ -155,13 +157,13 @@ describe('MemoryPool', () => {
             const config = testConfig(dir);
             const pool = new MemoryPool(config, new MockEmbedder());
             const before = await pool.create('x', { content: 'Original', summary: 'My summary', tags: ['test'] });
-            const beforeTime = before.changedAt().getTime();
+            const beforeTime = before.changedAt.getTime();
 
             await new Promise((r) => setTimeout(r, 10));
             await pool.update('x', { content: 'Updated' });
 
             const after = (await pool.get('x'))!;
-            expect(after.changedAt().getTime()).toBeGreaterThan(beforeTime);
+            expect(after.changedAt.getTime()).toBeGreaterThan(beforeTime);
         });
     });
 
@@ -179,16 +181,17 @@ describe('MemoryPool', () => {
     it('initialize loads memories from disk', async () => {
         await withTempDir(async (dir) => {
             const config = testConfig(dir);
-            const pool = new MemoryPool(config, new MockEmbedder());
+            const store = new JsonFileStore<MemoryJSON>({ dir: config.memoryDir });
+            const pool = new MemoryPool(config, new MockEmbedder(), store);
 
             await pool.create('init-1', { content: 'First', summary: 'First sum', tags: ['t1'] });
             await pool.create('init-2', { content: 'Second', summary: 'Second sum', tags: ['t2'] });
 
-            const pool2 = new MemoryPool(config, new MockEmbedder());
+            const pool2 = new MemoryPool(config, new MockEmbedder(), store);
             await pool2.initialize();
             expect(await pool2.all()).toHaveLength(2);
-            expect((await pool2.get('init-1'))?.content()).toBe('First');
-            expect((await pool2.get('init-2'))?.content()).toBe('Second');
+            expect((await pool2.get('init-1'))?.content).toBe('First');
+            expect((await pool2.get('init-2'))?.content).toBe('Second');
         });
     });
 
@@ -202,12 +205,13 @@ describe('MemoryPool', () => {
     it('initialize handles corrupt JSON files', async () => {
         await withTempDir(async (dir) => {
             const config = testConfig(dir);
-            const pool = new MemoryPool(config, new MockEmbedder());
+            const store = new JsonFileStore<MemoryJSON>({ dir: config.memoryDir });
+            const pool = new MemoryPool(config, new MockEmbedder(), store);
             await pool.create('valid', { content: 'good', summary: 'good sum' });
 
-            const pool2 = new MemoryPool(config, new MockEmbedder());
-            await fsp.mkdir(config.memoriesDir, { recursive: true });
-            await fsp.writeFile(`${config.memoriesDir}/corrupt.json`, '{bad json}', 'utf-8');
+            const pool2 = new MemoryPool(config, new MockEmbedder(), store);
+            await fsp.mkdir(config.memoryDir, { recursive: true });
+            await fsp.writeFile(`${config.memoryDir}/corrupt.json`, '{bad json}', 'utf-8');
             await pool2.initialize();
             const all = await pool2.all();
             expect(all).toHaveLength(1);
@@ -224,7 +228,7 @@ describe('MemoryPool', () => {
             const first = (await pool.get('x'))!;
             const second = (await pool.get('x'))!;
             expect(first).toBe(second); // same reference
-            expect(first.content()).toBe('Original');
+            expect(first.content).toBe('Original');
         });
     });
 
@@ -251,7 +255,7 @@ describe('MemoryPool', () => {
             await pool.create('a', { content: 'A', summary: 'A sum' });
 
             const before = (await pool.get('a'))!;
-            expect(before.recalledAt()).toBeNull();
+            expect(before.recalledAt).toBeNull();
 
             const results = await pool.recall('hello');
             expect(results).toHaveLength(1);
@@ -259,7 +263,7 @@ describe('MemoryPool', () => {
 
             // pool's internal memory should still have null recalledAt
             const stored = (await pool.get('a'))!;
-            expect(stored.recalledAt()).toBeNull();
+            expect(stored.recalledAt).toBeNull();
         });
     });
 
@@ -271,28 +275,29 @@ describe('MemoryPool', () => {
             await pool.create('a', { content: 'A', summary: 'A sum' });
 
             const before = (await pool.get('a'))!;
-            expect(before.recalledAt()).toBeNull();
+            expect(before.recalledAt).toBeNull();
 
             await pool.markRecalled('a');
 
             const after = (await pool.get('a'))!;
-            expect(after.recalledAt()).not.toBeNull();
+            expect(after.recalledAt).not.toBeNull();
         });
     });
 
     it('markRecalled persists recalledAt to disk', async () => {
         await withTempDir(async (dir) => {
             const config = testConfig(dir);
-            const pool = new MemoryPool(config, new MockEmbedder());
+            const store = new JsonFileStore<MemoryJSON>({ dir: config.memoryDir });
+            const pool = new MemoryPool(config, new MockEmbedder(), store);
 
             await pool.create('a', { content: 'A', summary: 'A sum' });
 
             await pool.markRecalled('a');
 
-            const pool2 = new MemoryPool(config, new MockEmbedder());
+            const pool2 = new MemoryPool(config, new MockEmbedder(), store);
             await pool2.initialize();
             const loaded = (await pool2.get('a'))!;
-            expect(loaded.recalledAt()).not.toBeNull();
+            expect(loaded.recalledAt).not.toBeNull();
         });
     });
 
@@ -330,7 +335,6 @@ describe('MemoryPool', () => {
         await withTempDir(async (dir) => {
             const config = testConfig(dir);
             const service = new MemoryService(config, new MockEmbedder());
-            await fsp.writeFile(path.join(dir, 'links.json'), '[]', 'utf-8');
             await service.init();
             const pool = service.memories();
             const linkPool = service.links();
@@ -347,8 +351,8 @@ describe('MemoryPool', () => {
             const b = (await pool.get('b'))!;
             const c = (await pool.get('c'))!;
 
-            expect(c.score()).toBeGreaterThan(b.score());
-            expect(b.score()).toBeGreaterThan(a.score());
+            expect(c.score).toBeGreaterThan(b.score);
+            expect(b.score).toBeGreaterThan(a.score);
         });
     });
 
@@ -373,8 +377,8 @@ describe('MemoryPool', () => {
             expect(emb).toHaveLength(4);
 
             const mem = await pool.get('x');
-            expect(mem!.embedding()).toEqual(emb);
-            expect(mem!.cachedAt()).not.toBeNull();
+            expect(mem!.embedding).toEqual(emb);
+            expect(mem!.cachedAt).not.toBeNull();
         });
     });
 
@@ -382,6 +386,22 @@ describe('MemoryPool', () => {
         const pool = new MemoryPool(new MemoryConfiguration(), new MockEmbedder());
         const emb = await pool.recomputeEmbedding('nonexistent');
         expect(emb).toBeNull();
+    });
+
+    it('ensureEmbeddings swallows embedder failures', async () => {
+        await withTempDir(async (dir) => {
+            const config = testConfig(dir);
+            const rejectingEmbedder: TextEmbeddingProvider = {
+                dimensions: () => 4,
+                async encode() {
+                    throw new Error('embedding failed');
+                }
+            };
+            const pool = new MemoryPool(config, rejectingEmbedder);
+            await pool.create('x', { content: 'A', summary: 'A sum' });
+            // The embedder rejects, but ensureEmbeddings must not throw.
+            await expect(pool.ensureEmbeddings()).resolves.toBeUndefined();
+        });
     });
 
     it('recall reuses cached embeddings on subsequent calls', async () => {
@@ -497,6 +517,96 @@ describe('MemoryPool', () => {
             const config = testConfig(dir);
             const pool = new MemoryPool(config, new MockEmbedder());
             expect(pool.config).toBe(config);
+        });
+    });
+
+    it('routes persistence through an injected store (no filesystem writes)', async () => {
+        const config = testConfig('/does-not-exist');
+        const store = new MemoryStore<MemoryJSON>();
+        const pool = new MemoryPool(config, new MockEmbedder(), store);
+
+        await pool.create('mem-1', { content: 'Content', summary: 'My summary', tags: ['t'] });
+
+        // the store received the value and nothing hit the filesystem
+        expect(await store.get('mem-1')).toBeDefined();
+        await expect(fsp.access(path.join(config.memoryDir, 'mem-1.json'))).rejects.toThrow();
+
+        expect((await pool.get('mem-1'))?.content).toBe('Content');
+        await pool.update('mem-1', { content: 'Changed' });
+        expect((await store.get('mem-1'))?.content).toBe('Changed');
+        await pool.delete('mem-1');
+        expect(await pool.get('mem-1')).toBeUndefined();
+        expect(await store.get('mem-1')).toBeUndefined();
+    });
+
+    it('persists through an injected JsonFileStore and reloads on initialize', async () => {
+        await withTempDir(async (dir) => {
+            const config = testConfig(dir);
+            const store = new JsonFileStore<MemoryJSON>({ dir: config.memoryDir });
+            const pool = new MemoryPool(config, new MockEmbedder(), store);
+
+            await pool.create('file-1', { content: 'Content', summary: 'My summary', tags: ['t'] });
+            expect(
+                await fsp.readFile(`${config.memoryDir}/file-1.json`, 'utf-8')
+            ).toContain('Content');
+
+            // a fresh pool over the same store loads it back from disk
+            const pool2 = new MemoryPool(config, new MockEmbedder(), store);
+            await pool2.initialize();
+            expect(await pool2.all()).toHaveLength(1);
+            expect((await pool2.get('file-1'))?.content).toBe('Content');
+
+            await pool2.delete('file-1');
+            const remaining = (await fsp.readdir(config.memoryDir)).filter((n) =>
+                n.endsWith('.json')
+            );
+            expect(remaining).toEqual([]);
+        });
+    });
+
+    it('skips corrupt entries individually with an injected store', async () => {
+        await withTempDir(async (dir) => {
+            const config = testConfig(dir);
+            const store = new JsonFileStore<MemoryJSON>({ dir: config.memoryDir });
+            const pool = new MemoryPool(config, new MockEmbedder(), store);
+            await pool.create('valid', { content: 'good', summary: 'good sum', tags: ['t'] });
+
+            const pool2 = new MemoryPool(config, new MockEmbedder(), store);
+            await fsp.mkdir(config.memoryDir, { recursive: true });
+            await fsp.writeFile(`${config.memoryDir}/corrupt.json`, '{bad json}', 'utf-8');
+            await pool2.initialize();
+
+            const all = await pool2.all();
+            expect(all).toHaveLength(1);
+            expect(all[0]!.id()).toBe('valid');
+        });
+    });
+
+    it('does not load files the injected store does not know about', async () => {
+        await withTempDir(async (dir) => {
+            const config = testConfig(dir);
+            const store = new MemoryStore<MemoryJSON>();
+            const pool = new MemoryPool(config, new MockEmbedder(), store);
+            await fsp.mkdir(config.memoryDir, { recursive: true });
+            // a file on disk that the empty store has no entry for
+            await fsp.writeFile(
+                `${config.memoryDir}/orphan.json`,
+                JSON.stringify({
+                    id: 'orphan',
+                    content: 'x',
+                    summary: 'y',
+                    tags: [],
+                    score: 1,
+                    embedding: null,
+                    cachedAt: null,
+                    createdAt: 1,
+                    changedAt: 1,
+                    recalledAt: null
+                }),
+                'utf-8'
+            );
+            await pool.initialize();
+            expect(await pool.all()).toEqual([]);
         });
     });
 });

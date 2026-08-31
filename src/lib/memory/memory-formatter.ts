@@ -8,7 +8,7 @@ export class MemoryFormatter {
 
     format(memory: ReadonlyMemory, summarize?: boolean, truncate?: boolean): string {
         if (summarize) {
-            return `${memory.id()}: ${memory.summary()}`;
+            return `${memory.id()}: ${memory.summary}`;
         }
 
         let content = JSON.stringify(memory.toJSON(), null, 2);

@@ -1,8 +1,9 @@
 import * as fsp from 'node:fs/promises';
-import * as path from 'node:path';
 import { Mutex } from 'async-mutex';
+import { MemoryStore, type ObjectStore } from '@johannes.latzel/json-file-store';
 import { type HasHooks, type Hook } from '@johannes.latzel/llm-chat';
-import { Memory } from './memory.js';
+import { Memory, type MemoryJSON } from './memory.js';
+import { type MemoryLinkJSON } from '../link/link.js';
 import { EventHookBuilder, HookEmitter } from '../hooks.js';
 import type { ReadonlyMemory } from './memory.js';
 import { MemoryConfiguration } from '../config.js';
@@ -113,6 +114,7 @@ export class MemoryPool implements MemoryPoolInterface, HasHooks<MemoryHookBuild
     private readonly _data: Map<string, Memory> = new Map();
     private readonly _mutex = new Mutex();
     private readonly _embedder: TextEmbeddingProvider;
+    private readonly _store: ObjectStore<MemoryJSON>;
     private readonly onCreateEmitter = new HookEmitter<(event: MemoryCreateEvent) => void>();
     private readonly onUpdateEmitter = new HookEmitter<(event: MemoryUpdateEvent) => void>();
     private readonly onDeleteEmitter = new HookEmitter<(event: MemoryDeleteEvent) => void>();
@@ -126,10 +128,18 @@ export class MemoryPool implements MemoryPoolInterface, HasHooks<MemoryHookBuild
     /**
      * @param config  Configuration for storage directory and limits. Defaults to a fresh {@link MemoryConfiguration}.
      * @param embedder  The embedding provider used for semantic recall.
+     * @param store  {@link ObjectStore} backend for persistence. Defaults to an
+     * in-memory {@link MemoryStore}; inject a {@link JsonFileStore} over
+     * {@link MemoryConfiguration.memoryDir} for durable file storage.
      */
-    constructor(config: MemoryConfiguration, embedder: TextEmbeddingProvider) {
+    constructor(
+        config: MemoryConfiguration,
+        embedder: TextEmbeddingProvider,
+        store: ObjectStore<MemoryJSON> = new MemoryStore<MemoryJSON>()
+    ) {
         this._config = config;
         this._embedder = embedder;
+        this._store = store;
     }
 
     /**
@@ -150,19 +160,13 @@ export class MemoryPool implements MemoryPoolInterface, HasHooks<MemoryHookBuild
     }
 
     private async _save(memory: Memory): Promise<void> {
-        const memoriesDir = this._config.memoriesDir;
-        await fsp.writeFile(
-            path.join(memoriesDir, `${memory.id()}.json`),
-            JSON.stringify(memory.toJSON(), null, 2),
-            'utf-8'
-        );
+        await this._store.set(memory.toJSON());
     }
 
     private async _load(id: string): Promise<Memory | null> {
-        const memoriesDir = this._config.memoriesDir;
         try {
-            const content = await fsp.readFile(path.join(memoriesDir, `${id}.json`), 'utf-8');
-            return new Memory(JSON.parse(content));
+            const json = await this._store.get(id);
+            return json ? new Memory(json) : null;
         } catch {
             return null;
         }
@@ -175,10 +179,10 @@ export class MemoryPool implements MemoryPoolInterface, HasHooks<MemoryHookBuild
     async initialize(): Promise<void> {
         return this._mutex.runExclusive(async () => {
             this._data.clear();
-            const memoriesDir = this._config.memoriesDir;
+            const memoryDir = this._config.memoryDir;
             let entries: string[];
             try {
-                entries = await fsp.readdir(memoriesDir);
+                entries = await fsp.readdir(memoryDir);
             } catch {
                 return;
             }
@@ -228,8 +232,6 @@ export class MemoryPool implements MemoryPoolInterface, HasHooks<MemoryHookBuild
 
             this._validateSummaryLength(input.summary, input.content);
 
-            const memoriesDir = this._config.memoriesDir;
-            await fsp.mkdir(memoriesDir, { recursive: true });
             await this._save(mem);
             this._data.set(id, mem);
             this.onCreateEmitter.emit({ id });
@@ -246,20 +248,20 @@ export class MemoryPool implements MemoryPoolInterface, HasHooks<MemoryHookBuild
             if (!mem) {
                 throw new Error(`Memory '${id}' not found`);
             }
-            if (input.content !== undefined) mem.content(input.content);
-            if (input.tags !== undefined) mem.tags(input.tags);
+            if (input.content !== undefined) mem.content = input.content;
+            if (input.tags !== undefined) mem.tags = input.tags;
             if (input.summary !== undefined) {
-                this._validateSummaryLength(input.summary, mem.content());
-                mem.summary(input.summary);
+                this._validateSummaryLength(input.summary, mem.content);
+                mem.summary = input.summary;
             } else if (input.content !== undefined) {
                 // content changed but summary didn't — re-validate existing summary
-                this._validateSummaryLength(mem.summary(), mem.content());
+                this._validateSummaryLength(mem.summary, mem.content);
             }
             // invalidate embedding cache when content or tags change
             if (input.content !== undefined || input.tags !== undefined) {
-                mem.cachedAt(null);
+                mem.cachedAt = null;
             }
-            mem.changedAt(new Date());
+            mem.changedAt = new Date();
 
             await this._save(mem);
             this.onUpdateEmitter.emit({ id });
@@ -277,8 +279,7 @@ export class MemoryPool implements MemoryPoolInterface, HasHooks<MemoryHookBuild
                 throw new Error(`Memory '${id}' not found`);
             }
             this._data.delete(id);
-            const memoriesDir = this._config.memoriesDir;
-            await fsp.rm(path.join(memoriesDir, `${id}.json`), { force: true });
+            await this._store.delete(id);
             this.onDeleteEmitter.emit({ id });
         });
     }
@@ -313,7 +314,7 @@ export class MemoryPool implements MemoryPoolInterface, HasHooks<MemoryHookBuild
             const scored: Array<{ mem: Memory; sim: number }> = [];
 
             for (const mem of this._data.values()) {
-                const vec = mem.embedding();
+                const vec = mem.embedding;
                 if (!vec) continue;
                 const sim = cosineSimilarity(queryEmbedding, vec);
                 if (sim >= this._config.similarityGate) {
@@ -343,9 +344,9 @@ export class MemoryPool implements MemoryPoolInterface, HasHooks<MemoryHookBuild
         const needsRecompute: Memory[] = [];
         for (const mem of this._data.values()) {
             if (
-                mem.embedding() === null ||
-                !mem.cachedAt() ||
-                mem.cachedAt()!.getTime() < mem.changedAt()!.getTime()
+                mem.embedding === null ||
+                !mem.cachedAt ||
+                mem.cachedAt!.getTime() < mem.changedAt!.getTime()
             ) {
                 needsRecompute.push(mem);
             }
@@ -367,14 +368,14 @@ export class MemoryPool implements MemoryPoolInterface, HasHooks<MemoryHookBuild
             const mem = this._data.get(id);
             if (!mem) return null;
             await this._recomputeMemoryEmbedding(mem);
-            return mem.embedding();
+            return mem.embedding;
         });
     }
 
     private async _recomputeMemoryEmbedding(mem: Memory): Promise<void> {
         const vec = await this._embedder.encode(mem.embeddingInput());
-        mem.embedding(vec);
-        mem.cachedAt(new Date());
+        mem.embedding = vec;
+        mem.cachedAt = new Date();
         await this._save(mem);
     }
 
@@ -398,6 +399,19 @@ export class MemoryPool implements MemoryPoolInterface, HasHooks<MemoryHookBuild
     }
 
     /**
+     * Replaces the outgoing links on a single memory and persists them.
+     * Used by the {@link LinkPool} to keep each memory's link field in sync.
+     */
+    async updateLinks(id: string, links: MemoryLinkJSON[]): Promise<void> {
+        return this._mutex.runExclusive(async () => {
+            const mem = this._data.get(id);
+            if (!mem) return;
+            mem.links = links;
+            await this._save(mem);
+        });
+    }
+
+    /**
      * Updates a single memory's score in-memory and on disk.
      * Intended for use by {@link MemoryService#score}.
      */
@@ -405,7 +419,7 @@ export class MemoryPool implements MemoryPoolInterface, HasHooks<MemoryHookBuild
         return this._mutex.runExclusive(async () => {
             const mem = this._data.get(id);
             if (!mem) return;
-            mem.score(score);
+            mem.score = score;
             await this._save(mem);
         });
     }
@@ -415,7 +429,7 @@ export class MemoryPool implements MemoryPoolInterface, HasHooks<MemoryHookBuild
         return this._mutex.runExclusive(async () => {
             const mem = this._data.get(id);
             if (!mem) return;
-            mem.recalledAt(new Date());
+            mem.recalledAt = new Date();
             await this._save(mem);
             this.onRecallEmitter.emit({ id });
         });

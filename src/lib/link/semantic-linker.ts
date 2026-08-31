@@ -42,11 +42,11 @@ export class SemanticLinker implements Linker {
 
         for (let i = 0; i < memories.length; i++) {
             const a = memories[i]!;
-            const embA = a.embedding();
+            const embA = a.embedding;
             if (!embA) continue;
             for (let j = i + 1; j < memories.length; j++) {
                 const b = memories[j]!;
-                const embB = b.embedding();
+                const embB = b.embedding;
                 if (!embB) continue;
                 const sim = cosineSimilarity(embA, embB);
                 if (sim >= gate) {
