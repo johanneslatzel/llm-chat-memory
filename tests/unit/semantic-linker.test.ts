@@ -11,7 +11,7 @@ describe('SemanticLinker', () => {
         await withTempDir(async (dir) => {
             const config = testConfig(dir);
             const pool = new MemoryPool(config, new MockEmbedder());
-            const linkPool = new LinkPool(config);
+            const linkPool = new LinkPool(pool);
 
             const linker = new SemanticLinker(pool, linkPool);
 
@@ -31,7 +31,7 @@ describe('SemanticLinker', () => {
         await withTempDir(async (dir) => {
             const config = testConfig(dir);
             const pool = new MemoryPool(config, new MockEmbedder());
-            const linkPool = new LinkPool(config);
+            const linkPool = new LinkPool(pool);
 
             const linker = new SemanticLinker(pool, linkPool);
 
@@ -48,7 +48,7 @@ describe('SemanticLinker', () => {
         await withTempDir(async (dir) => {
             const config = testConfig(dir);
             const pool = new MemoryPool(config, new MockEmbedder());
-            const linkPool = new LinkPool(config);
+            const linkPool = new LinkPool(pool);
 
             const linker = new SemanticLinker(pool, linkPool);
 
@@ -67,7 +67,7 @@ describe('SemanticLinker', () => {
         await withTempDir(async (dir) => {
             const config = testConfig(dir);
             const pool = new MemoryPool(config, new MockEmbedder());
-            const linkPool = new LinkPool(config);
+            const linkPool = new LinkPool(pool);
 
             const linker = new SemanticLinker(pool, linkPool);
 
@@ -85,7 +85,7 @@ describe('SemanticLinker', () => {
             const config = testConfig(dir);
             config.similarityGate = 1.01;
             const pool = new MemoryPool(config, new MockEmbedder());
-            const linkPool = new LinkPool(config);
+            const linkPool = new LinkPool(pool);
 
             const linker = new SemanticLinker(pool, linkPool);
 

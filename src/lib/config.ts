@@ -1,4 +1,3 @@
-import * as path from 'node:path';
 import { envFloat, envInt, envString } from '../env.js';
 import {
     DEFAULT_EMBEDDING_MODEL,
@@ -21,11 +20,6 @@ import {
 export class MemoryConfiguration {
     /** Directory path where memory JSON files are persisted. */
     memoryDir: string;
-
-    /** Convenience getter for the memories sub-directory. */
-    get memoriesDir(): string {
-        return path.join(this.memoryDir, 'memories');
-    }
 
     /** Maximum number of memories to inject per individual message. */
     maxInjectPerMessage: number;

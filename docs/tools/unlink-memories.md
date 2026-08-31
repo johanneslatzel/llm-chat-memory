@@ -1,6 +1,6 @@
 # unlink_memories
 
-Remove explicit references from one memory to one or more other memories. Only removes constant (explicit) links, not semantic similarity links.
+Remove explicit references from one memory to one or more other memories. Removes any existing link (constant or semantic) in that direction.
 
 | Parameter | Required | Description |
 |---|---|---|

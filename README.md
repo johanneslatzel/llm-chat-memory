@@ -22,7 +22,7 @@ Persistent memory for LLM agents by active (tool call) and passive (inject) reca
 - manual (constant) and automatic (semantic similarity) memory linking
 - PageRank-based importance scoring over the link graph
 - pluggable selection strategies: MMR (default) and weighted random
-- JSON file persistence for memories and links
+- JSON file persistence
 - configurable via `MemoryConfiguration` objects and environment variables
 
 ## Prerequisites
@@ -41,7 +41,7 @@ Full documentation at **[johanneslatzel.github.io/llm-chat-memory/](https://joha
 
 ## License
 
-MIT — see [`LICENSE`](LICENSE).
+MIT. See [`LICENSE`](LICENSE).
 
 ## Contributing
 

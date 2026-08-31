@@ -1,14 +1,14 @@
-# How it works
+# Architecture
 
 ## Why persistent memory?
 
-LLM conversations have a finite context window. Old messages — including facts the agent learned earlier — get pushed out when the window fills up, gets compacted, or a sliding window moves. If you told the agent your coffee preference 50 messages ago, it's gone.
+LLM conversations have a finite context window. Old messages, including facts the agent learned earlier, get pushed out when the window fills up, gets compacted, or a sliding window moves. A fact mentioned 50 messages ago is gone.
 
-This package solves that by giving agents a **persistent memory store** — a place to write facts, notes, and decisions that survive across turns, conversations, and restarts.
+This package solves that by giving agents a **persistent memory store**: a place to write facts, notes, and decisions that survive across turns, conversations, and restarts.
 
 ## Shared: semantic recall via embedding similarity
 
-Memories are matched to conversation context using **embedding-based cosine similarity**, not keyword triggers. Every memory's content is encoded into a vector embedding (cached alongside the JSON file, invalidated when content changes). On recall, the incoming message is encoded once and compared against all cached embeddings. The most semantically similar memories — above a configurable similarity floor — qualify as candidates.
+Memories are matched to conversation context using **embedding-based cosine similarity**, not keyword triggers. Every memory's content is encoded into a vector embedding (cached alongside the JSON file, invalidated when content changes). On recall, the incoming message is encoded once and compared against all cached embeddings. The most semantically similar memories, above a configurable similarity floor, qualify as candidates.
 
 This means paraphrase, synonymy, and indirect references all work naturally: "my dog is sick" matches a memory about "the veterinarian visit" even though they share no keywords.
 
@@ -35,17 +35,18 @@ Every stored memory is:
 |---|---|---|
 | `id` | Uniquely identifies the memory (sanitised from the label, also the filename) |
 | `content` | The text to remember |
-| `summary` | Short summary (50–200 chars, ≤10% of content length). Shown during injection; full content fetched on demand. |
+| `summary` | Short summary (50–600 chars, up to 20% of content length). Shown during injection; full content fetched on demand. |
 | `tags` | Categories used to augment the embedding input |
-| `score` | PageRank importance — higher score = more linked-to |
+| `score` | PageRank importance: higher score = more linked-to |
 | `createdAt` / `changedAt` / `recalledAt` | Track when it was made, edited, last surfaced |
 | `embedding` | Cached vector + `cachedAt` timestamp for invalidation |
+| `links` | This memory's **outgoing** directed links (explicit + semantic), persisted inside its own file |
 
 Triggers (word/regex/tag) are removed. Semantic similarity handles recall fully.
 
 ## The service
 
-`MemoryService` is the central entry point. It owns both a `MemoryPool` (pure CRUD + recall) and a `LinkPool` (link graph), and provides the convenient `recall()` that auto-links consecutive results.
+`MemoryService` is the central entry point. It owns both a `MemoryPool` (pure CRUD + recall) and a `LinkPool` (link graph). Semantic similarity links are recomputed by running the semantic linker (`service.linker.sync()`).
 
 ```typescript
 const service = new MemoryService(config, embedder);
@@ -96,16 +97,40 @@ This is **non-invasive**: the agent controls when and what to look up. Useful fo
 
 ## File storage
 
-Each memory is an individual JSON file in the `memories/` subdirectory, containing content, tags, summary, and its cached embedding vector:
+Each memory is an individual JSON file in the `memories/` subdirectory, named
+after its slug id. Content, tags, summary, its cached embedding vector, and
+its outgoing links are stored in the file:
 
 ```text
 ./memories/
-  memories/
-    a1b2c3d4-... .json
-    e5f6g7h8-... .json
-  links.json
+  project-context.json
+  installation-notes.json
+  user-preferences.json
 ```
 
-The full directed link graph (explicit links + semantic similarity links) is persisted in `links.json` at the top level, flushed on demand via `service.save()`. On startup, `service.init()` loads both the individual memory files and the link graph, then recalculates PageRank scores.
+The directed link graph is stored **inside each memory file** via the `links`
+field: every memory carries its own outgoing links (explicit constant links
+plus semantic-similarity links). Links are flushed eagerly whenever the graph
+changes (link/unlink/isolate/sync), so there is no separate `links.json`. On
+startup, `service.init()` loads the individual memory files, rebuilds the
+in-memory link graph from each file's `links` field, then recalculates
+PageRank scores.
 
 This makes it easy to inspect, backup, or edit memories directly. No database needed.
+
+
+### Directory store integration (json-file-store)
+
+Every `MemoryPool` is always backed by an `ObjectStore<MemoryJSON>` from the
+`@johannes.latzel/json-file-store` package. All save/load/delete operations
+route through `store.set`/`store.get`/`store.delete`; `initialize()` only
+lists the memories directory and loads each file through the store.
+
+By default the `MemoryPool` uses an in-memory `MemoryStore`. For durable file
+storage, `MemoryService` constructs a `JsonFileStore` over
+`config.memoryDir` when no store is supplied, so a default service persists
+memories to disk. A caller-supplied store always takes precedence.
+
+Memory ids are file-safe lowercase slugs, so they double as the JSON filenames
+used by `JsonFileStore` without any id mapping or migration. Corrupt entries
+are skipped individually during `initialize()`.

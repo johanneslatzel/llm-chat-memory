@@ -2,10 +2,12 @@ import { randomUUID } from 'node:crypto';
 import * as fsp from 'node:fs/promises';
 import * as path from 'node:path';
 import { describe, it, expect, vi } from 'vitest';
+import { MemoryStore } from '@johannes.latzel/json-file-store';
 import { ChatMessageOrigin, ChatRole, ChatService } from '@johannes.latzel/llm-chat';
 import type { ChatMessage } from '@johannes.latzel/llm-chat';
 import { MemoryService } from '../../src/lib/memory-service.js';
 import { MemoryConfiguration } from '../../src/lib/config.js';
+import type { MemoryJSON } from '../../src/lib/memory/memory.js';
 import { testConfig } from '../helper/config.js';
 import { withTempDir } from '../helper/temp-fs.js';
 import { MockEmbedder } from '../helper/mock-embedder.js';
@@ -81,7 +83,6 @@ describe('MemoryService', () => {
         await withTempDir(async (dir) => {
             const config = testConfig(dir);
             const service = new MemoryService(config, new MockEmbedder());
-            await fsp.writeFile(path.join(dir, 'links.json'), '[]', 'utf-8');
             await service.init();
             expect(await service.memories().all()).toEqual([]);
         });
@@ -91,11 +92,24 @@ describe('MemoryService', () => {
         await withTempDir(async (dir) => {
             const config = testConfig(dir);
             const service = new MemoryService(config, new MockEmbedder());
-            await fsp.writeFile(path.join(dir, 'links.json'), '[]', 'utf-8');
             await service.init();
             await service.init();
             expect(await service.memories().all()).toEqual([]);
         });
+    });
+
+    it('passes an injected store through to the memory pool', async () => {
+        const store = new MemoryStore<MemoryJSON>();
+        const service = new MemoryService(
+            testConfig('/does-not-exist'),
+            new MockEmbedder(),
+            undefined,
+            store
+        );
+        await service.memories().create('mem-1', { content: 'Content', summary: 'My summary' });
+        expect(await store.get('mem-1')).toBeDefined();
+        await service.memories().delete('mem-1');
+        expect(await store.get('mem-1')).toBeUndefined();
     });
 
     describe('recall', () => {
@@ -134,7 +148,6 @@ describe('MemoryService', () => {
             await withTempDir(async (dir) => {
                 const config = testConfig(dir);
                 const service = new MemoryService(config, new MockEmbedder());
-                await fsp.writeFile(path.join(dir, 'links.json'), '[]', 'utf-8');
                 await service.init();
                 const pool = service.memories();
                 const linkPool = service.links();
@@ -151,8 +164,8 @@ describe('MemoryService', () => {
                 const b = (await pool.get('b'))!;
                 const c = (await pool.get('c'))!;
 
-                expect(c.score()).toBeGreaterThan(b.score());
-                expect(b.score()).toBeGreaterThan(a.score());
+                expect(c.score).toBeGreaterThan(b.score);
+                expect(b.score).toBeGreaterThan(a.score);
             });
         });
 
@@ -160,7 +173,6 @@ describe('MemoryService', () => {
             await withTempDir(async (dir) => {
                 const config = testConfig(dir);
                 const service = new MemoryService(config, new MockEmbedder());
-                await fsp.writeFile(path.join(dir, 'links.json'), '[]', 'utf-8');
                 await service.init();
                 const pool = service.memories();
                 await pool.create('a', { content: 'A', summary: 'A sum', tags: ['test'] });
@@ -168,7 +180,7 @@ describe('MemoryService', () => {
                 await service.score();
 
                 const a = (await pool.get('a'))!;
-                expect(a.score()).toBeDefined();
+                expect(a.score).toBeDefined();
             });
         });
 
@@ -176,7 +188,6 @@ describe('MemoryService', () => {
             await withTempDir(async (dir) => {
                 const config = testConfig(dir);
                 const service = new MemoryService(config, new MockEmbedder());
-                await fsp.writeFile(path.join(dir, 'links.json'), '[]', 'utf-8');
                 await service.init();
                 const pool = service.memories();
                 const linkPool = service.links();
@@ -187,7 +198,7 @@ describe('MemoryService', () => {
                 await linkPool.link('a', 'b');
 
                 await expect(service.score()).resolves.toBeUndefined();
-                expect((await pool.get('a'))?.score()).toBeDefined();
+                expect((await pool.get('a'))?.score).toBeDefined();
             });
         });
     });
@@ -854,21 +865,22 @@ describe('MemoryService', () => {
         });
     });
 
-    it('save persists links to disk', async () => {
+    it('persists links eager on the source memory file', async () => {
         await withTempDir(async (dir) => {
             const config = testConfig(dir);
             const service = new MemoryService(config, new MockEmbedder());
-            await fsp.writeFile(path.join(dir, 'links.json'), '[]', 'utf-8');
             await service.init();
 
+            await service.memories().create('a', { content: 'A', summary: 'A sum' });
+            await service.memories().create('b', { content: 'B', summary: 'B sum' });
             await service.links().link('a', 'b');
-            await service.save();
 
-            const content = await fsp.readFile(path.join(dir, 'links.json'), 'utf-8');
+            const content = await fsp.readFile(
+                path.join(config.memoryDir, 'a.json'),
+                'utf-8'
+            );
             const data = JSON.parse(content);
-            expect(data).toHaveLength(1);
-            expect(data[0]!.from).toBe('a');
-            expect(data[0]!.to).toBe('b');
+            expect(data.links).toEqual([{ type: 'constant', to: 'b' }]);
         });
     });
 

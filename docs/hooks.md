@@ -20,10 +20,10 @@ full content.
 
 `ChatService.injectToolCall(toolName, args)` executes the tool silently,
 queues an assistant message with the tool call, and queues the tool response.
-It does **not** call `interrupt()` or `send()` — the caller is responsible
+It does **not** call `interrupt()` or `send()`; the caller is responsible
 for flushing.
 
-If you are inside a **beforeSendLoop** or **afterSend** hook callback, use
+Inside a **beforeSendLoop** or **afterSend** hook callback, use
 `setNeedsResend()` to trigger a resend:
 
 ```typescript
@@ -52,11 +52,11 @@ A memory is injected at most once per hook.
 
 ### MemoryHook callbacks
 
-- **`onBeforeSendLoop`** — scans **User** messages only, recalls matching
+- **`onBeforeSendLoop`**: scans **User** messages only, recalls matching
   memories via semantic similarity, and calls
   `injectToolCall('get_memory', { ids, summary: true })` with the new IDs.
   Does not call `setNeedsResend`.
-- **`onAfterSend`** — scans **model-origin Reasoning** messages only, recalls
+- **`onAfterSend`**: scans **model-origin Reasoning** messages only, recalls
   matching memories, filters out any whose ID is already in the session's
   injected set, and calls `injectToolCall('get_memory', { ids, summary: true })`
   for the new ones. Calls `setNeedsResend()` if any were injected.
@@ -77,12 +77,12 @@ range of messages without duplicating work.
 
 2. **Model responds** → `afterSend` fires with the new assistant+reasoning
    messages. Scans model-origin Reasoning messages, recalls memories, filters
-   against the session set — finds only **new** IDs. Calls batch
+   against the session set, finds only **new** IDs. Calls batch
    `injectToolCall` and `setNeedsResend()`.
 
 3. **Resend loop** → `beforeSendLoop` fires again. Sees no new User messages.
    The same memories are already in the session's injected set. `afterSend`
-   fires again — IDs are in the session set, so they are skipped. No new
+   fires again, IDs are in the session set, so they are skipped. No new
    tool calls pile up.
 
 4. **User sends another message** → `beforeSendLoop` fires (the send-retry

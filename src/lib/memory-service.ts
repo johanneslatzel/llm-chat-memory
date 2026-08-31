@@ -1,4 +1,5 @@
 import { Mutex } from 'async-mutex';
+import { JsonFileStore, type ObjectStore } from '@johannes.latzel/json-file-store';
 import {
     ChatMessageOrigin,
     ChatRole,
@@ -16,7 +17,7 @@ import { SemanticLinker, type Linker } from './link/semantic-linker.js';
 import { MMRSelectionStrategy } from './selection/mmr.js';
 import { ScoreComposer } from './selection/composer.js';
 import { expDecay } from './util.js';
-import type { ReadonlyMemory } from './memory/memory.js';
+import type { MemoryJSON, ReadonlyMemory } from './memory/memory.js';
 import type { TextEmbeddingProvider } from './embedding/provider.js';
 import { ScoredMemory } from './selection/types.js';
 import type { SelectionStrategy } from './selection/types.js';
@@ -171,7 +172,6 @@ export class MemoryServiceHookBuilder {
  * - `score()` runs PageRank over the link graph and updates scores.
  * - `memories()` / `links()` expose narrow interfaces for CRUD and link management.
  * - `hook()` exposes lifecycle hooks for the memory and link pools.
- * - `save()` persists links to disk — call before shutdown.
  * - Deleting a memory: call `memories().delete(id)` and `links().isolate(id)`.
  * - `hookInto()` creates a {@link MemoryHook} and registers lifecycle hooks
  *   for passive recall on a ChatService. Returns the {@link MemoryHook} so callers
@@ -194,11 +194,15 @@ export class MemoryService implements HasHooks<MemoryServiceHookBuilder> {
     constructor(
         config: MemoryConfiguration,
         embedder: TextEmbeddingProvider,
-        strategy?: SelectionStrategy
+        strategy?: SelectionStrategy,
+        store?: ObjectStore<MemoryJSON>
     ) {
         this._config = config;
-        this.pool = new MemoryPool(config, embedder);
-        this.linkPool = new LinkPool(config);
+        // Default to durable JsonFileStore storage under the configured
+        // memories dir; a caller-supplied store takes precedence.
+        const effectiveStore = store ?? new JsonFileStore<MemoryJSON>({ dir: config.memoryDir });
+        this.pool = new MemoryPool(config, embedder, effectiveStore);
+        this.linkPool = new LinkPool(this.pool);
         this.embedder = embedder;
         const composer = new ScoreComposer(
             config.similarityWeight,
@@ -263,15 +267,15 @@ export class MemoryService implements HasHooks<MemoryServiceHookBuilder> {
 
         const cap = maxInject ?? this._config.maxInjectPerMessage;
         const scored: ScoredMemory[] = candidates
-            .filter((c) => c.memory.embedding() != null)
+            .filter((c) => c.memory.embedding != null)
             .map(
                 (c) =>
                     new ScoredMemory(
                         c.memory.id(),
                         c.similarity,
-                        c.memory.score(),
-                        this._recencyFactor(c.memory.recalledAt()),
-                        c.memory.embedding()!
+                        c.memory.score,
+                        this._recencyFactor(c.memory.recalledAt),
+                        c.memory.embedding!
                     )
             );
 
@@ -289,12 +293,9 @@ export class MemoryService implements HasHooks<MemoryServiceHookBuilder> {
         return selected;
     }
 
-    /** Persists all links to disk. Call before shutdown to persist link state. */
-    async save(): Promise<void> {
-        await this.linkPool.save();
-    }
-
-    /** Runs PageRank over the current link graph and updates scores on every memory. */
+    /**
+     * Runs PageRank over the current link graph and updates scores on every memory.
+     */
     async score(): Promise<void> {
         const edges = await this.linkPool.getEdges();
         const pg = new PageRank();

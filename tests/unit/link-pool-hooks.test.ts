@@ -1,9 +1,13 @@
 import { describe, it, expect, vi } from 'vitest';
 import { LinkPool } from '../../src/lib/link/link-pool.js';
 import { MemoryConfiguration } from '../../src/lib/config.js';
+import { MemoryPool } from '../../src/lib/memory/memory-pool.js';
+import { MockEmbedder } from '../helper/mock-embedder.js';
 
 function makePool(): LinkPool {
-    return new LinkPool(new MemoryConfiguration());
+    const config = new MemoryConfiguration();
+    const pool = new MemoryPool(config, new MockEmbedder());
+    return new LinkPool(pool);
 }
 
 describe('LinkPool hooks', () => {

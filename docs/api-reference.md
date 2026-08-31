@@ -18,11 +18,10 @@ await service.init();
 
 | Method | What it does |
 |---|---|
-| `init()` | Load memories and links from disk, then recalculate PageRank scores |
-| `memories()` | → `MemoryPoolInterface` — direct access to the underlying CRUD pool (for tools) |
-| `links()` | → `LinkPoolInterface` — direct access to the underlying link graph (for tools) |
-| `recall(message, maxInject?)` | Semantic recall via embedding similarity — see [How it works](architecture.md#shared-semantic-recall-via-embedding-similarity) |
-| `save()` | Persist the link graph to disk — call before shutdown |
+| `init()` | Load memories from disk, rebuild the link graph from each file's `links` field, then recalculate PageRank scores |
+| `memories()` | → `MemoryPoolInterface`: direct access to the underlying CRUD pool (for tools) |
+| `links()` | → `LinkPoolInterface`: direct access to the underlying link graph (for tools) |
+| `recall(message, maxInject?)` | Semantic recall via embedding similarity: see [How it works](architecture.md#shared-semantic-recall-via-embedding-similarity) |
 | `score()` | Re-run PageRank over the link graph and persist updated scores |
 | `hookInto(chatService)` | Register lifecycle hooks (`beforeSendLoop` and `afterSend`) on a `ChatService` for passive recall. Uses caps from `MemoryConfiguration`. |
 
@@ -33,9 +32,8 @@ await service.init();
 | `create(label, input)` | Create a new memory. Requires `content` and `summary` (50–600 chars, ≤20% of content length). |
 | `get(id)` | → `Promise<ReadonlyMemory \| undefined>` |
 | `all()` | → `Promise<ReadonlyMemory[]>` |
-| `has(id)` | → `boolean` — check if a memory ID exists |
-| `update(id, input)` | Update an existing memory's fields. Changes to content or tags invalidate the cached embedding. |
- | `delete(id)` | Delete a memory and remove its file from disk (does **not** clean up links — call `service.links().isolate(id)` separately) |
+| `has(id)` | → `boolean`: check if a memory ID exists |
+| `delete(id)` | Delete a memory and remove its file from disk (does **not** clean up links: call `service.links().isolate(id)` separately) |
 | `ensureEmbeddings()` | Recompute stale or missing embeddings for all memories. Called automatically by `recall`, but useful to invoke manually after bulk imports/updates. |
 
 ## LinkPoolInterface methods (accessed via `service.links()`)
@@ -48,19 +46,21 @@ await service.init();
 
 ## Memory fields
 
-A `Memory` exposes its fields via accessor methods (`mem.id()`, `mem.content()`, etc.). Fields with a setter are writable; `id` and `createdAt` are read-only.
+A `Memory` exposes its fields via native get/set accessors (`mem.content`, `mem.score`, etc.). Fields with a setter are writable; `id` and `createdAt` are read-only and remain plain methods.
 
 | Field | Accessor | Writable |
 |---|---|---|
 | `id` | `mem.id()` | No |
-| `content` | `mem.content()` / `mem.content(value)` | Yes |
-| `summary` | `mem.summary()` / `mem.summary(value)` | Yes |
-| `tags` | `mem.tags()` / `mem.tags(value)` | Yes |
-| `score` | `mem.score()` / `mem.score(value)` | Yes |
-| `embedding` (cached vector) | `mem.embedding()` / `mem.embedding(value)` | Yes |
+| `content` | `mem.content` (get/set) | Yes |
+| `summary` | `mem.summary` (get/set) | Yes |
+| `tags` | `mem.tags` (get/set) | Yes |
+| `score` | `mem.score` (get/set) | Yes |
+| `embedding` (cached vector) | `mem.embedding` (get/set) | Yes |
+| `links` | `mem.links` (get/set) | Yes |
 | `createdAt` | `mem.createdAt()` | No |
-| `changedAt` | `mem.changedAt()` / `mem.changedAt(value)` | Yes |
-| `recalledAt` | `mem.recalledAt()` / `mem.recalledAt(value)` | Yes |
-| `cachedAt` | `mem.cachedAt()` / `mem.cachedAt(value)` | Yes |
+| `changedAt` | `mem.changedAt` (get/set) | Yes |
+| `recalledAt` | `mem.recalledAt` (get/set) | Yes |
+| `cachedAt` | `mem.cachedAt` (get/set) | Yes |
+
 
 Triggers (word/regex/tag) are removed. Semantic similarity handles recall fully.

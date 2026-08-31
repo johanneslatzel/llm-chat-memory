@@ -20,10 +20,10 @@ describe('ConstantMemoryLink', () => {
 
     it('round-trips through JSON', () => {
         const link = new ConstantMemoryLink('a', 'b');
-        const json = link.toJSON();
-        expect(json).toEqual({ type: 'constant', from: 'a', to: 'b' });
+        const json = link.toMemoryLinkJSON();
+        expect(json).toEqual({ type: 'constant', to: 'b' });
 
-        const restored = MemoryLink.fromJSON(json);
+        const restored = MemoryLink.fromMemoryLinkJSON('a', json);
         expect(restored).toBeInstanceOf(ConstantMemoryLink);
         expect(restored.from).toBe('a');
         expect(restored.to).toBe('b');
@@ -41,16 +41,15 @@ describe('SemanticMemoryLink', () => {
 
     it('round-trips through JSON', () => {
         const link = new SemanticMemoryLink('a', 'b', 0.75);
-        const json = link.toJSON();
+        const json = link.toMemoryLinkJSON();
         expect(json).toEqual({
             type: 'semantic',
-            from: 'a',
             to: 'b',
             weight: 0.75,
             cachedAt: expect.any(Number),
         });
 
-        const restored = MemoryLink.fromJSON(json);
+        const restored = MemoryLink.fromMemoryLinkJSON('a', json);
         expect(restored).toBeInstanceOf(SemanticMemoryLink);
         expect(restored.from).toBe('a');
         expect(restored.to).toBe('b');

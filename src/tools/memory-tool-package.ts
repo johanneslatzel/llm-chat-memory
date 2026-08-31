@@ -9,7 +9,7 @@ import { RecallMemoriesTool } from './recall-memories.js';
 import { LinkMemoriesTool } from './link-memories.js';
 import { UnlinkMemoriesTool } from './unlink-memories.js';
 
-const MEMORY_GUIDE = `Memory system stores knowledge as memories with content, tags, summary, and auto-calculated PageRank score (from link graph). All memories require a summary (50-600 chars, at most 20% of content length). Link related memories via link_memories. Semantic similarity links are computed automatically.`;
+const MEMORY_GUIDE = `Memory system stores knowledge as memories with content, tags, summary, and auto-calculated PageRank score (from link graph). All memories require a summary (50-600 chars, at most 20% of content length). Link related memories via link_memories. Semantic similarity links are computed by the semantic linker: run service.linker.sync() to recompute them.`;
 
 /**
  * A {@link ToolPackage} that bundles all memory-management tools.

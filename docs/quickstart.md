@@ -1,4 +1,4 @@
-# Quick Start
+# Quickstart
 
 ## Installation
 
@@ -34,3 +34,7 @@ await memoryService.memories().ensureEmbeddings();
 // Relevant memories auto-inject as synthetic tool calls
 // (id + summary). The LLM can retrieve full content on demand.
 ```
+
+## Full API
+
+See the [API reference](api-reference.md) for the complete configuration, pool, memory fields, and link-graph API.
