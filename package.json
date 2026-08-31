@@ -86,7 +86,7 @@
         "husky": "^9.1.7",
         "lint-staged": "^17.4.1",
         "prettier": "^3.5.3",
-        "typescript": "^6.0.3",
+        "typescript": "^7.0.2",
         "vitest": "^4.1.11",
         "@johannes.latzel/check-line-limits": "^1.0.1"
     }
