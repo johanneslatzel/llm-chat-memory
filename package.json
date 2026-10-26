@@ -71,7 +71,7 @@
     "dependencies": {
         "@huggingface/transformers": "^4.2.0",
         "@johannes.latzel/json-file-store": "^0.1.0",
-        "@johannes.latzel/llm-chat": "^0.7.0",
+        "@johannes.latzel/llm-chat": "^0.8.0",
         "@johannes.latzel/pagerank": "^1.0.3",
         "async-mutex": "^0.5.0"
     },
