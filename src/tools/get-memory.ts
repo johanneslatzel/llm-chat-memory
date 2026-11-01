@@ -25,7 +25,7 @@ export class GetMemoryTool extends Tool {
                     ids: ToolParameterProperty.array(
                         'Array of memory IDs to retrieve.',
                         ToolParameterProperty.string('memory ID')
-                    ),
+                    ).accepts('id'),
                     summary: ToolParameterProperty.boolean(
                         'If true, returns only the summary field for each memory instead of the full content. Default false.'
                     ),

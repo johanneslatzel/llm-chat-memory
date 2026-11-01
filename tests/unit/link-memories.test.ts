@@ -81,6 +81,23 @@ describe('LinkMemoriesTool', () => {
         });
     });
 
+    it('reports already-linked targets without failing', async () => {
+        await withTempDir(async (dir) => {
+            const config = testConfig(dir);
+            const service = new MemoryService(config, new MockEmbedder());
+            const pool = service.memories();
+            const tool = new LinkMemoriesTool(service);
+            await pool.create('a', { content: 'A', summary: 'A', tags: ['a'] });
+            await pool.create('b', { content: 'B', summary: 'B', tags: ['b'] });
+
+            await tool.execute({ id: 'a', targets: ['b'] });
+            const result = await tool.execute({ id: 'a', targets: ['b'] });
+
+            expect(result[0]!.status).toBe('success');
+            expect(result[0]!.result).toContain('Already linked');
+        });
+    });
+
     it('skips linking to self', async () => {
         await withTempDir(async (dir) => {
             const config = testConfig(dir);

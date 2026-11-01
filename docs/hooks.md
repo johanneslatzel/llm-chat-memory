@@ -8,7 +8,8 @@ a standard tool-call → tool-result → assistant-response cycle.
 
 Injection uses a single synthetic `get_memory` call with `ids: string[]` and
 `summary: true`, rather than N separate per-memory calls. The tool response
-returns all memories as `[{ id, summary }, ...]` in one message. This keeps
+returns one `id: summary` line per memory in one text result, with blank
+lines between memories. This keeps
 scaffolding overhead to exactly 2 messages, regardless of how many memories
 are injected.
 
@@ -23,20 +24,21 @@ queues an assistant message with the tool call, and queues the tool response.
 It does **not** call `interrupt()` or `send()`; the caller is responsible
 for flushing.
 
-Inside a **beforeSendLoop** or **afterSend** hook callback, use
-`setNeedsResend()` to trigger a resend:
+Inside an **afterSend** hook callback, use `setNeedsResend()` to trigger a
+resend. A **beforeSendLoop** injection is drained by the upcoming send and does
+not need the flag:
 
 ```typescript
-await service.injectToolCall('get_memory', { ids: [id1, id2], summary: true });
-service.setNeedsResend();
+await chatService.injectToolCall('get_memory', { ids: [id1, id2], summary: true });
+chatService.setNeedsResend();
 ```
 
 Outside hooks, call `interrupt(true)` and `send()`:
 
 ```typescript
-await service.injectToolCall('get_memory', { ids: [id1, id2], summary: true });
-service.interrupt(true);
-await service.send();
+await chatService.injectToolCall('get_memory', { ids: [id1, id2], summary: true });
+chatService.interrupt(true);
+await chatService.send();
 ```
 
 ## How MemoryService.hookInto uses injectToolCall
@@ -103,8 +105,8 @@ the session's injected set.
 | Method | Purpose |
 |---|---|
 | `injectToolCall(toolName, args)` | Execute a tool silently and queue assistant + tool-response messages |
-| `setNeedsResend()` | Flag that the send loop should re-run (use inside hook callbacks) |
-| `interrupt(clearQueue)` | Interrupt the current send loop iteration |
+| `setNeedsResend()` | Flag that the send loop should re-run (use inside `afterSend`) |
+| `interrupt(needsResend?)` | Abort the in-flight request; when `needsResend` is true, `send()` retries |
 | `send()` | Flush queued messages to the model |
 
 The `injectToolCall` method is provided by `@johannes.latzel/llm-chat` and is

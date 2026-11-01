@@ -6,5 +6,5 @@ Modify an existing memory. Only supplied fields are changed.
 |---|---|---|
 | `id` | yes | ID of the memory to update |
 | `content` | no | New text |
-| `summary` | no | New short summary (50–600 characters, up to 20% of content length) |
-| `tags` | no | Array of new tags. Changes to content or tags invalidate the cached embedding. |
+| `summary` | no | New short summary (at least 50 characters; at most `max(600, 20% of content length)`) |
+| `tags` | no | Array of new tags. Changes to content or tags invalidate the cached embedding. The hidden alias `tag` is accepted for `tags`. |

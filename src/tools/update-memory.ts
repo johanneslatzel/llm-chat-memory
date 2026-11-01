@@ -25,12 +25,12 @@ export class UpdateMemoryTool extends Tool {
                     id: ToolParameterProperty.string('The ID of the memory to update.'),
                     content: ToolParameterProperty.string('The new memory content.'),
                     summary: ToolParameterProperty.string(
-                        'Short summary of the memory (50-600 characters, up to 20% of content length).'
+                        'New short summary. At least 50 characters; at most max(600, 20% of content length).'
                     ),
                     tags: ToolParameterProperty.array(
                         'Optional array of tags.',
                         ToolParameterProperty.string('tag')
-                    )
+                    ).accepts('tag')
                 },
                 ['id']
             )

@@ -25,7 +25,7 @@ export class RecallMemoriesTool extends Tool {
                         'The message text to match against memory content via embedding similarity.'
                     ),
                     max_results: ToolParameterProperty.number(
-                        'Optional maximum number of results (capped by configuration).'
+                        'Optional maximum number of results. Overrides the configured default.'
                     )
                 },
                 ['message']

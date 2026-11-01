@@ -1,0 +1,120 @@
+<mxfile host="app.diagrams.net" agent="mcp-server export_drawio" version="24.7.17">
+  <diagram id="llm-chat-memory-architecture" name="Architecture">
+    <mxGraphModel dx="1120" dy="720" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1120" pageHeight="720" math="0" shadow="0" background="#ffffff">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="pad" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="0" y="0" width="1120" height="720" as="geometry" />
+        </mxCell>
+
+        <mxCell id="chat" value="ChatService&#10;(llm-chat)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#1f2937;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="430" y="20" width="220" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="hook" value="MemoryHook&#10;passive recall" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#1f2937;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="220" y="110" width="260" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="tools" value="MemoryToolPackage&#10;7 tools" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=#1f2937;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="600" y="110" width="260" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="service" value="MemoryService" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8fafc;strokeColor=#6c8ebf;verticalAlign=top;spacingTop=8;fontColor=#1f2937;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="220" width="1000" height="360" as="geometry" />
+        </mxCell>
+
+        <mxCell id="pool" value="MemoryPool&#10;CRUD + semantic candidates" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=#1f2937;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="340" y="280" width="220" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="embedder" value="TextEmbeddingProvider&#10;encode()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#1f2937;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="100" y="280" width="200" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="selection" value="SelectionStrategy&#10;MMR / weighted random" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=#1f2937;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="600" y="280" width="220" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="composer" value="ScoreComposer&#10;sim + PageRank + recency" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=#1f2937;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="600" y="400" width="220" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="linkPool" value="LinkPool&#10;directed links" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=#1f2937;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="860" y="280" width="200" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="linker" value="SemanticLinker&#10;semantic links" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#1f2937;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="860" y="400" width="200" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="store" value="ObjectStore&#10;JsonFileStore / MemoryStore" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#1f2937;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="340" y="620" width="220" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="memories" value="memories/*.json&#10;one JSON file per memory" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#1f2937;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="600" y="620" width="260" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e_chat_hook" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;strokeColor=#6482b9;exitX=0.3;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="chat" target="hook">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="496" y="90" />
+              <mxPoint x="350" y="90" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_chat_tools" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;strokeColor=#6482b9;exitX=0.7;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="chat" target="tools">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="584" y="90" />
+              <mxPoint x="730" y="90" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_hook_service" value="recall + inject" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;strokeColor=#6482b9;fontColor=#1f2937;fontSize=12;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.27;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="hook" target="service">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" x="55" y="0" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_tools_service" value="CRUD + recall" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;strokeColor=#6482b9;fontColor=#1f2937;fontSize=12;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.65;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="tools" target="service">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" x="55" y="0" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_pool_embedder" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;strokeColor=#6482b9;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="pool" target="embedder">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" x="0" y="-12" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_pool_selection" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;strokeColor=#6482b9;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="pool" target="selection">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" x="0" y="-12" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_selection_composer" value="score" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;strokeColor=#6482b9;fontColor=#1f2937;fontSize=12;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="selection" target="composer">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" x="30" y="0" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_linkPool_pool" value="links + scores" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;strokeColor=#6482b9;fontColor=#1f2937;fontSize=12;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.727;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="linkPool" target="pool">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="960" y="250" />
+              <mxPoint x="500" y="250" />
+            </Array>
+            <mxPoint as="offset" x="0" y="12" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_pool_store" value="save / load" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;strokeColor=#6482b9;fontColor=#1f2937;fontSize=12;exitX=0.182;exitY=1;exitDx=0;exitDy=0;entryX=0.182;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="pool" target="store">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" x="50" y="0" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_store_memories" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;strokeColor=#6482b9;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="store" target="memories">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" x="0" y="-12" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_linker_linkPool" value="sync()" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;strokeColor=#6482b9;fontColor=#1f2937;fontSize=12;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="linker" target="linkPool">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" x="35" y="0" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

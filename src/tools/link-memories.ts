@@ -26,7 +26,7 @@ export class LinkMemoriesTool extends Tool {
                     targets: ToolParameterProperty.array(
                         'Array of target memory IDs to link to.',
                         ToolParameterProperty.string('target memory ID')
-                    )
+                    ).accepts('target')
                 },
                 ['id', 'targets']
             )
@@ -50,9 +50,11 @@ export class LinkMemoriesTool extends Tool {
         const invalid = targets.filter((t: string) => t !== idCheck.value && !this.pool.has(t));
         const valid = targets.filter((t: string) => t !== idCheck.value && this.pool.has(t));
         const linked = await this.linkPool.link(idCheck.value, valid);
+        const alreadyLinked = valid.filter((target) => !linked.includes(target));
 
         const parts: string[] = [];
         if (linked.length > 0) parts.push(`Linked to: ${linked.join(', ')}`);
+        if (alreadyLinked.length > 0) parts.push(`Already linked: ${alreadyLinked.join(', ')}`);
         if (invalid.length > 0) parts.push(`Not found (skipped): ${invalid.join(', ')}`);
         if (parts.length === 0) {
             return {

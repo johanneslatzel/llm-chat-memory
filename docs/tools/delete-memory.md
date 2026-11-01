@@ -1,6 +1,6 @@
 # delete_memory
 
-Remove a memory by ID. Deletes both the pool entry and the JSON file on disk.
+Remove a memory by ID. Deletes the pool entry, the JSON file on disk, and every link involving the memory.
 
 | Parameter | Required | Description |
 |---|---|---|

@@ -15,7 +15,7 @@ import { MemoryService, MemoryToolPackage, MemoryConfiguration, HuggingFaceEmbed
 import { OpenAIChatService } from '@johannes.latzel/llm-chat';
 
 const config = new MemoryConfiguration();
-const embedder = new HuggingFaceEmbeddingProvider();
+const embedder = new HuggingFaceEmbeddingProvider({ model: config.embeddingModel });
 const memoryService = new MemoryService(config, embedder);
 await memoryService.init();
 

@@ -49,6 +49,11 @@ chatService.tools().add(new MemoryToolPackage(memoryService));
 | [get_memory](get-memory.md) | View memory details |
 | [recall_memories](recall-memories.md) | Manually trigger recall |
 | [link_memories](link-memories.md) | Create explicit links between memories |
-| [unlink_memories](unlink-memories.md) | Remove explicit links between memories |
+| [unlink_memories](unlink-memories.md) | Remove links between memories |
 
-All parameters are strings or numbers. `tags` is an array of strings.
+Parameters are strings, numbers, or booleans; `tags`, `ids`, and `targets` are arrays of strings.
+
+The array parameters also accept hidden singular aliases: `id` for `ids` in
+`get_memory`, `tag` for `tags` in `add_memory` and `update_memory`, and
+`target` for `targets` in `link_memories` and `unlink_memories`. Aliases are
+normalized before execution and never appear in the tool schemas.

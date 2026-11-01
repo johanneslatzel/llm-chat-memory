@@ -25,12 +25,12 @@ export class AddMemoryTool extends Tool {
                     ),
                     content: ToolParameterProperty.string('The memory content to store.'),
                     summary: ToolParameterProperty.string(
-                        'Short summary of the memory (50-600 characters, up to 20% of content length). Helps the LLM understand the core idea at a glance.'
+                        'Short summary of the memory. At least 50 characters; at most max(600, 20% of content length). Helps the LLM understand the core idea at a glance.'
                     ),
                     tags: ToolParameterProperty.array(
                         'Optional array of tags for categorization.',
                         ToolParameterProperty.string('tag')
-                    )
+                    ).accepts('tag')
                 },
                 ['id', 'content', 'summary']
             )

@@ -26,7 +26,7 @@ export class UnlinkMemoriesTool extends Tool {
                     targets: ToolParameterProperty.array(
                         'Array of target memory IDs to unlink.',
                         ToolParameterProperty.string('target memory ID')
-                    )
+                    ).accepts('target')
                 },
                 ['id', 'targets']
             )

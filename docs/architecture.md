@@ -1,6 +1,8 @@
 # Architecture
 
-## Why persistent memory?
+![llm-chat-memory architecture: ChatService connects through MemoryHook and MemoryToolPackage to MemoryService, which owns the pools, selection, embedding and storage](assets/llm-chat-memory-architecture.svg)
+
+## Persistent memory for finite context windows
 
 LLM conversations have a finite context window. Old messages, including facts the agent learned earlier, get pushed out when the window fills up, gets compacted, or a sliding window moves. A fact mentioned 50 messages ago is gone.
 
@@ -8,13 +10,13 @@ This package solves that by giving agents a **persistent memory store**: a place
 
 ## Shared: semantic recall via embedding similarity
 
-Memories are matched to conversation context using **embedding-based cosine similarity**, not keyword triggers. Every memory's content is encoded into a vector embedding (cached alongside the JSON file, invalidated when content changes). On recall, the incoming message is encoded once and compared against all cached embeddings. The most semantically similar memories, above a configurable similarity floor, qualify as candidates.
+Memories are matched to conversation context using **embedding-based cosine similarity**, not keyword triggers. Every memory's content is encoded into a vector embedding (cached inside the memory JSON file, invalidated when the memory changes). On recall, the incoming message is encoded once and compared against all cached embeddings. The most semantically similar memories, above a configurable similarity floor, qualify as candidates.
 
-This means paraphrase, synonymy, and indirect references all work naturally: "my dog is sick" matches a memory about "the veterinarian visit" even though they share no keywords.
+This means paraphrase, synonymy, and indirect references all match: "my dog is sick" matches a memory about "the veterinarian visit" even though they share no keywords.
 
 Tags are concatenated to the content during embedding, acting as a semantic anchor for internal jargon.
 
-Both recall modes use the same algorithm:
+The hook and the `recall_memories` tool share the same recall pipeline:
 
 ```text
 1. Encode   →  embed the input message into a query vector
@@ -22,9 +24,12 @@ Both recall modes use the same algorithm:
 3. Filter   →  absolute floor (default ~0.4) + elbow-based relative cutoff
 4. Select   →  MMR or weighted random sampling (configurable) 
                using composite score = α·sim + β·pageRank + γ·recency
-5. Cap      →  per-message and per-send-loop limits
-6. Resume   →  skip memories already injected in this session
-7. Inject   →  batch tool-call with ids + summaries (see hooks.md)
+5. Cap      →  per-message limit (`maxInject` or `maxInjectPerMessage`)
+
+Passive injection adds:
+6. Deduplicate → skip memories already injected in this session and apply
+                 the per-send-loop cap
+7. Inject      → batch tool-call with ids + summaries (see hooks.md)
 ```
 
 ## Memory anatomy
@@ -35,7 +40,7 @@ Every stored memory is:
 |---|---|---|
 | `id` | Uniquely identifies the memory (sanitised from the label, also the filename) |
 | `content` | The text to remember |
-| `summary` | Short summary (50–600 chars, up to 20% of content length). Shown during injection; full content fetched on demand. |
+| `summary` | Short summary (at least 50 chars; at most `max(600, 20% of content length)`). Shown during injection; full content fetched on demand. |
 | `tags` | Categories used to augment the embedding input |
 | `score` | PageRank importance: higher score = more linked-to |
 | `createdAt` / `changedAt` / `recalledAt` | Track when it was made, edited, last surfaced |
@@ -51,49 +56,23 @@ Triggers (word/regex/tag) are removed. Semantic similarity handles recall fully.
 ```typescript
 const service = new MemoryService(config, embedder);
 await service.init();  // pool.initialize() + linkPool.load() + score()
-service.recall(message);  // pool.recall() + select via strategy + mark recalled
+await service.recall(message);  // pool.recall() + select via strategy + mark recalled
 ```
 
 ### Passive recall (hookInto)
 
-Call `service.hookInto(chatService)` to wire passive recall into the
-ChatService's lifecycle hooks:
-
-```typescript
-service.hookInto(chatService);
-```
-
-`MemoryService.hookInto` creates a per-call `MemoryHook` session and
-registers it into the ChatService's `beforeSendLoop` and `afterSend`
-lifecycle hooks (see the llm-chat package docs for hook semantics). It
-returns the `MemoryHook` so callers can call `.dispose()` to
-unregister the hooks later.
-
-Memory injection is tracked **per `MemoryHook` instance** via a local `Set<memoryId>`, so a memory is only injected once per session regardless of send-loop boundaries. Each call to `hookInto()` creates a fresh hook with its own tracking set, so different `ChatService` instances (different sessions) have independent tracking.
-
-The two callbacks process different message roles (`onBeforeSendLoop`
-handles User messages; `onAfterSend` handles model-origin Reasoning
-messages). Both use the same semantic recall algorithm. Injection uses
-a batch tool-call pattern: a single synthetic `get_memory` call with
-`ids` and `summary: true` returns all new memories at once, keeping
-scaffolding overhead to exactly 2 messages.
-
-Injection is capped by two limits:
-- `maxInjectPerMessage` (max memories per individual message)
-- `maxInjectPerSendLoop` (cumulative cap for the entire send cycle)
-
-`MemoryPool` and `LinkPool` each carry their own `Mutex` to serialise internal
-state access, so they remain safe even when accessed from independent callers
-(e.g. tools and hook callbacks).
-
-See [hooks.md](hooks.md) for a detailed walkthrough of the injection
-mechanism.
+`service.hookInto(chatService)` creates a per-call `MemoryHook` and registers
+it on the ChatService `beforeSendLoop` and `afterSend` hooks. The hook recalls
+semantically related memories, injects each at most once per session through a
+single batched `get_memory` call, and returns a disposable handle. See
+[hooks.md](hooks.md) for the callback roles, tracking, and injection limits.
 
 ### Active recall (recall_memories tool)
 
-The LLM calls `recall_memories` with a message text. It runs the same algorithm but returns results as a tool response instead of injecting them into conversation.
-
-This is **non-invasive**: the agent controls when and what to look up. Useful for explicit lookups: "check what I know about topic X".
+The `recall_memories` tool runs the same recall pipeline on demand. This is
+**non-invasive**: the agent controls when and what to look up, which is useful
+for explicit lookups such as "check what I know about topic X". See
+[`recall_memories`](tools/recall-memories.md).
 
 ## File storage
 
@@ -117,7 +96,6 @@ in-memory link graph from each file's `links` field, then recalculates
 PageRank scores.
 
 This makes it easy to inspect, backup, or edit memories directly. No database needed.
-
 
 ### Directory store integration (json-file-store)
 

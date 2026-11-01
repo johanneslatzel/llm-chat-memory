@@ -27,13 +27,13 @@ export class MemoryConfiguration {
     /** Cumulative cap for the entire send-loop cycle. */
     maxInjectPerSendLoop: number;
 
-    /** Token truncation limit per memory's injected content. */
+    /** Character limit for serialized memory JSON returned by get_memory. */
     maxInjectionContentLength: number;
 
     /** Minimum cosine similarity for a memory to be considered relevant. */
     similarityGate: number;
 
-    /** Hugging Face model ID for local embedding generation. */
+    /** Default model ID for HuggingFaceEmbeddingProvider. */
     embeddingModel: string;
 
     /** Minimum summary length in characters. */

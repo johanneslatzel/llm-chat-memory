@@ -6,7 +6,7 @@ Store a new memory that can be recalled later by semantic similarity.
 |---|---|---|
 | `id` | yes | Unique label for the memory. Sanitised to lowercase-hyphenated form. |
 | `content` | yes | The text to remember |
-| `summary` | yes | Short summary (50–600 characters, up to 20% of content length) |
-| `tags` | no | Array of categorization tags, e.g. `["work","project-x"]` |
+| `summary` | yes | Short summary (at least 50 characters; at most `max(600, 20% of content length)`) |
+| `tags` | no | Array of categorization tags, e.g. `["work","project-x"]`. The hidden alias `tag` is accepted for `tags`. |
 
-Returns the new memory's ID.
+Returns a confirmation message with the new memory's id.

@@ -13,11 +13,13 @@
 
 Persistent memory for LLM agents by active (tool call) and passive (inject) recall. Plugs into the [llm-chat](https://github.com/johanneslatzel/llm-chat) ecosystem.
 
+![llm-chat-memory architecture: ChatService connects through MemoryHook and MemoryToolPackage to MemoryService, which owns the pools, selection, embedding and storage](https://raw.githubusercontent.com/johanneslatzel/llm-chat-memory/main/docs/assets/llm-chat-memory-architecture.svg)
+
 ## Features
 
 - tagged, linked, and scored memories with embedding support
 - active recall via dedicated tool calls
-- passive recall via automatic chat lifecycle hooks automatically injecting memories
+- passive recall via automatic chat lifecycle hooks that inject memories
 - embedding-based semantic similarity search
 - manual (constant) and automatic (semantic similarity) memory linking
 - PageRank-based importance scoring over the link graph
@@ -27,7 +29,7 @@ Persistent memory for LLM agents by active (tool call) and passive (inject) reca
 
 ## Prerequisites
 
-- Node.js >= 20.9.0
+- Node.js >= 22
 
 ## Installation
 
