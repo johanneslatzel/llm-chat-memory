@@ -1,12 +1,7 @@
 import { Mutex } from 'async-mutex';
 import { JsonFileStore, type ObjectStore } from '@johannes.latzel/json-file-store';
-import {
-    ChatMessageOrigin,
-    ChatRole,
-    ChatService,
-    Hook,
-    type HasHooks
-} from '@johannes.latzel/llm-chat';
+import { ChatMessageOrigin, ChatRole } from '@johannes.latzel/llm-chat-message';
+import { Hook, type HasHooks } from '@johannes.latzel/llm-chat-tool';
 import { PageRank } from '@johannes.latzel/pagerank';
 import { MemoryConfiguration } from './config.js';
 import { MemoryPool, type MemoryPoolInterface } from './memory/memory-pool.js';
@@ -22,6 +17,32 @@ import type { TextEmbeddingProvider } from './embedding/provider.js';
 import { ScoredMemory } from './selection/types.js';
 import type { SelectionStrategy } from './selection/types.js';
 
+/**
+ * The slice of a chat service that passive recall uses.
+ *
+ * Typed structurally so the package does not depend on the chat engine; a
+ * `ChatService` from `@johannes.latzel/llm-chat` satisfies it as is.
+ */
+export interface RecallHookTarget {
+    /** Access the conversation. */
+    chat(): {
+        messages(): ReadonlyArray<{
+            role: ChatRole;
+            content: string;
+            origin: ChatMessageOrigin;
+        }>;
+    };
+    /** Register send-lifecycle hooks. */
+    hook(): {
+        beforeSendLoop(): { do(callback: () => void): Hook };
+        afterSend(): { do(callback: () => void): Hook };
+    };
+    /** Mark the current response for another send. */
+    setNeedsResend(): void;
+    /** Queue a synthetic tool call. */
+    injectToolCall(toolName: string, args: Record<string, unknown>): Promise<void>;
+}
+
 class MemoryHook {
     private lastProcessedCount = 0;
     private readonly mutex = new Mutex();
@@ -33,7 +54,7 @@ class MemoryHook {
     private readonly injectedIds: Set<string> = new Set();
 
     constructor(
-        private readonly service: ChatService,
+        private readonly service: RecallHookTarget,
         private readonly memoryService: MemoryService,
         private readonly config: MemoryConfiguration
     ) {
@@ -318,7 +339,7 @@ export class MemoryService implements HasHooks<MemoryServiceHookBuilder> {
      *
      * @returns A {@link MemoryHook} that can be used to {@link MemoryHook.dispose dispose} the hooks later.
      */
-    hookInto(chatService: ChatService): MemoryHook {
+    hookInto(chatService: RecallHookTarget): MemoryHook {
         const memoryHook = new MemoryHook(chatService, this, this._config);
         const before = chatService
             .hook()

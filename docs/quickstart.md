@@ -3,8 +3,10 @@
 ## Installation
 
 ```bash
-npm install @johannes.latzel/llm-chat-memory
+npm install @johannes.latzel/llm-chat-memory @johannes.latzel/llm-chat-openai
 ```
+
+The examples use the OpenAI provider; `@johannes.latzel/llm-chat-openai` installs the matching `llm-chat` engine.
 
 ## Basic Usage
 
@@ -12,7 +14,7 @@ This wires memory into a chat service so the LLM can save and recall facts, and 
 
 ```typescript
 import { MemoryService, MemoryToolPackage, MemoryConfiguration, HuggingFaceEmbeddingProvider } from '@johannes.latzel/llm-chat-memory';
-import { OpenAIChatService } from '@johannes.latzel/llm-chat';
+import { OpenAIChatService } from '@johannes.latzel/llm-chat-openai';
 
 const config = new MemoryConfiguration();
 const embedder = new HuggingFaceEmbeddingProvider({ model: config.embeddingModel });

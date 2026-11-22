@@ -1,4 +1,4 @@
-import { ToolPackage } from '@johannes.latzel/llm-chat';
+import { ToolPackage } from '@johannes.latzel/llm-chat-tool';
 
 import { MemoryService } from '../lib/memory-service.js';
 import { AddMemoryTool } from './add-memory.js';

@@ -15,7 +15,7 @@ describe('hidden singular aliases', () => {
         await withTempDir(async (dir) => {
             const service = new MemoryService(testConfig(dir), new MockEmbedder());
             const cases: Array<{
-                tool: { toOpenAI(): { function: { parameters?: unknown } } };
+                tool: { definition(): { parameters?: unknown } };
                 canonical: string;
                 alias: string;
             }> = [
@@ -27,7 +27,7 @@ describe('hidden singular aliases', () => {
             ];
 
             for (const { tool, canonical, alias } of cases) {
-                const parameters = tool.toOpenAI().function.parameters as {
+                const parameters = tool.definition().parameters as {
                     properties: Record<string, unknown>;
                 };
                 expect(parameters.properties[canonical]).toBeDefined();

@@ -12,6 +12,22 @@ theme:
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
+nav:
+  - Overview: index.md
+  - Quick Start: quickstart.md
+  - How It Works: architecture.md
+  - Hooks: hooks.md
+  - Environment Variables: env.md
+  - Tool Reference:
+      - Overview: tools/index.md
+      - add_memory: tools/add-memory.md
+      - update_memory: tools/update-memory.md
+      - delete_memory: tools/delete-memory.md
+      - get_memory: tools/get-memory.md
+      - recall_memories: tools/recall-memories.md
+      - link_memories: tools/link-memories.md
+      - unlink_memories: tools/unlink-memories.md
+  - API Reference: api-reference.md
 plugins:
   - search
 markdown_extensions:

@@ -2,13 +2,13 @@
 
 ![llm-chat-memory architecture: ChatService connects through MemoryHook and MemoryToolPackage to MemoryService, which owns the pools, selection, embedding and storage](assets/llm-chat-memory-architecture.svg)
 
-## Persistent memory for finite context windows
+## Persistent Memory for Finite Context Windows
 
 LLM conversations have a finite context window. Old messages, including facts the agent learned earlier, get pushed out when the window fills up, gets compacted, or a sliding window moves. A fact mentioned 50 messages ago is gone.
 
 This package solves that by giving agents a **persistent memory store**: a place to write facts, notes, and decisions that survive across turns, conversations, and restarts.
 
-## Shared: semantic recall via embedding similarity
+## Shared: Semantic Recall via Embedding Similarity
 
 Memories are matched to conversation context using **embedding-based cosine similarity**, not keyword triggers. Every memory's content is encoded into a vector embedding (cached inside the memory JSON file, invalidated when the memory changes). On recall, the incoming message is encoded once and compared against all cached embeddings. The most semantically similar memories, above a configurable similarity floor, qualify as candidates.
 
@@ -32,7 +32,7 @@ Passive injection adds:
 7. Inject      → batch tool-call with ids + summaries (see hooks.md)
 ```
 
-## Memory anatomy
+## Memory Anatomy
 
 Every stored memory is:
 
@@ -49,7 +49,7 @@ Every stored memory is:
 
 Triggers (word/regex/tag) are removed. Semantic similarity handles recall fully.
 
-## The service
+## The Service
 
 `MemoryService` is the central entry point. It owns both a `MemoryPool` (pure CRUD + recall) and a `LinkPool` (link graph). Semantic similarity links are recomputed by running the semantic linker (`service.linker.sync()`).
 
@@ -74,7 +74,7 @@ The `recall_memories` tool runs the same recall pipeline on demand. This is
 for explicit lookups such as "check what I know about topic X". See
 [`recall_memories`](tools/recall-memories.md).
 
-## File storage
+## File Storage
 
 Each memory is an individual JSON file in the `memories/` subdirectory, named
 after its slug id. Content, tags, summary, its cached embedding vector, and

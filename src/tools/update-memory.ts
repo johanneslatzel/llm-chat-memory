@@ -4,7 +4,7 @@ import {
     Tool,
     ToolParameterProperty,
     ToolParameters
-} from '@johannes.latzel/llm-chat';
+} from '@johannes.latzel/llm-chat-tool';
 import { MemoryService } from '../lib/memory-service.js';
 import type { MemoryPoolInterface } from '../lib/memory/memory-pool.js';
 import type { LinkPoolInterface } from '../lib/link/link-pool.js';

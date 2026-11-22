@@ -4,7 +4,7 @@ import {
     Tool,
     ToolParameterProperty,
     ToolParameters
-} from '@johannes.latzel/llm-chat';
+} from '@johannes.latzel/llm-chat-tool';
 import { MemoryService } from '../lib/memory-service.js';
 
 /** LLM-callable tool that deletes a memory by ID and cleans up its links. */

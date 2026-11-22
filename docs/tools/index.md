@@ -1,7 +1,9 @@
-# LLM tools
+# LLM Tools
 
 Seven tools give the LLM read/write access to memories. Register them on a
-`ChatService`, constructing each tool from a `MemoryService`:
+`ChatService`, constructing each tool from a `MemoryService`.
+
+The example uses `@johannes.latzel/llm-chat-openai` as the provider; install it alongside this package.
 
 ```typescript
 import {
@@ -14,7 +16,7 @@ import {
     LinkMemoriesTool,
     UnlinkMemoriesTool
 } from '@johannes.latzel/llm-chat-memory';
-import { OpenAIChatService } from '@johannes.latzel/llm-chat';
+import { OpenAIChatService } from '@johannes.latzel/llm-chat-openai';
 
 const memoryService = new MemoryService(config, embedder);
 await memoryService.init();
@@ -33,7 +35,7 @@ Or bundle all seven with `MemoryToolPackage`:
 
 ```typescript
 import { MemoryService, MemoryToolPackage } from '@johannes.latzel/llm-chat-memory';
-import { OpenAIChatService } from '@johannes.latzel/llm-chat';
+import { OpenAIChatService } from '@johannes.latzel/llm-chat-openai';
 
 const memoryService = new MemoryService(config, embedder);
 await memoryService.init();

@@ -108,7 +108,7 @@ Recompute PageRank over the link graph and persist updated scores. Returns
 
 | Param | Type | Default | Description |
 |---|---|---|---|
-| `chatService` | `ChatService` | required | Chat service to attach passive recall to |
+| `chatService` | `RecallHookTarget` | required | Chat service to attach passive recall to; a `ChatService` satisfies it |
 
 Registers callbacks on `beforeSendLoop` and `afterSend`. Returns a
 `MemoryHook` with `dispose()` to unregister them.
@@ -254,7 +254,7 @@ service.hook().links().onLink().do(({ from, to }) => {
 
 Each `do(callback)` returns a `Hook` with `dispose()`.
 
-## `Memory` fields
+## `Memory` Fields
 
 A `Memory` exposes its fields via native get/set accessors
 (`mem.content`, `mem.score`, etc.). Fields with a setter are writable;

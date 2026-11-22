@@ -1,5 +1,5 @@
-import { ResultStatus } from '@johannes.latzel/llm-chat';
-import type { PartialToolResult } from '@johannes.latzel/llm-chat';
+import { ResultStatus } from '@johannes.latzel/llm-chat-tool';
+import type { PartialToolResult } from '@johannes.latzel/llm-chat-tool';
 
 /**
  * Parses a JSON string into a string array.

@@ -12,6 +12,7 @@ export type {
 export type { CreateMemoryInput, UpdateMemoryInput } from './lib/memory/memory-pool.js';
 export { MemoryLink, ConstantMemoryLink, SemanticMemoryLink, LinkType } from './lib/link/link.js';
 export { MemoryService, MemoryServiceHookBuilder } from './lib/memory-service.js';
+export type { RecallHookTarget } from './lib/memory-service.js';
 export { LinkHookBuilder } from './lib/link/link-pool.js';
 export type { LinkPoolInterface, LinkCreateEvent, LinkRemoveEvent } from './lib/link/link-pool.js';
 export { SemanticLinker } from './lib/link/semantic-linker.js';

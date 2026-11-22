@@ -1,5 +1,5 @@
 import { Mutex } from 'async-mutex';
-import { type HasHooks, type Hook } from '@johannes.latzel/llm-chat';
+import { type HasHooks, type Hook } from '@johannes.latzel/llm-chat-tool';
 import { MemoryLink, ConstantMemoryLink, SemanticMemoryLink } from './link.js';
 import type { MemoryPool } from '../memory/memory-pool.js';
 import { EventHookBuilder, HookEmitter } from '../hooks.js';

@@ -1,4 +1,4 @@
-import { Hook, HookBuilderBase } from '@johannes.latzel/llm-chat';
+import { Hook, HookBuilderBase } from '@johannes.latzel/llm-chat-tool';
 
 class RegistrationHook extends Hook {
     constructor(private readonly unsubscribe: () => void) {

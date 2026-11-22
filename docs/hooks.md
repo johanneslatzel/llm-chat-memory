@@ -1,10 +1,10 @@
-# Hook-based tool injection
+# Hook-Based Tool Injection
 
 Hooks can inject synthetic tool-call cycles via `ChatService.injectToolCall()`.
 Instead of injecting plain assistant text ("i remember: ..."), the LLM sees
 a standard tool-call → tool-result → assistant-response cycle.
 
-## Batch injection via summary
+## Batch Injection via Summary
 
 Injection uses a single synthetic `get_memory` call with `ids: string[]` and
 `summary: true`, rather than N separate per-memory calls. The tool response
@@ -41,7 +41,7 @@ chatService.interrupt(true);
 await chatService.send();
 ```
 
-## How MemoryService.hookInto uses injectToolCall
+## How MemoryService.hookInto Uses injectToolCall
 
 `MemoryService.hookInto(chatService)` creates a per-call `MemoryHook`
 session and registers two lifecycle callbacks on the ChatService. It returns
@@ -92,13 +92,13 @@ range of messages without duplicating work.
    the previously injected IDs, so they won't be re-injected. New memories
    matching the new message can still be added.
 
-## Mutex guard
+## Mutex Guard
 
 A `Mutex` (from `async-mutex`) wraps both callbacks, ensuring they never run
 concurrently if they fire at the same time. This prevents race conditions on
 the session's injected set.
 
-## API reference
+## API Reference
 
 ### ChatService methods consumed by hooks
 
@@ -111,3 +111,8 @@ the session's injected set.
 
 The `injectToolCall` method is provided by `@johannes.latzel/llm-chat` and is
 available on any `ChatService` instance.
+
+`hookInto()` is typed against `RecallHookTarget`, a structural interface with
+`chat().messages()`, `beforeSendLoop()` and `afterSend()`, `setNeedsResend()`,
+and `injectToolCall()`. A `ChatService` satisfies it, and the package does not
+depend on the engine at runtime or install time.

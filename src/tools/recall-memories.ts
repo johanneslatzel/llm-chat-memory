@@ -4,7 +4,7 @@ import {
     Tool,
     ToolParameterProperty,
     ToolParameters
-} from '@johannes.latzel/llm-chat';
+} from '@johannes.latzel/llm-chat-tool';
 import { MemoryFormatter } from '../lib/memory/memory-formatter.js';
 import { MemoryService } from '../lib/memory-service.js';
 import { requireString } from '../lib/tool-utils.js';

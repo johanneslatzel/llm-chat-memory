@@ -1,7 +1,7 @@
 import * as fsp from 'node:fs/promises';
 import { Mutex } from 'async-mutex';
 import { MemoryStore, type ObjectStore } from '@johannes.latzel/json-file-store';
-import { type HasHooks, type Hook } from '@johannes.latzel/llm-chat';
+import { type HasHooks, type Hook } from '@johannes.latzel/llm-chat-tool';
 import { Memory, type MemoryJSON } from './memory.js';
 import { type MemoryLinkJSON } from '../link/link.js';
 import { EventHookBuilder, HookEmitter } from '../hooks.js';
